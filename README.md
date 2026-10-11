@@ -1,2 +1,22 @@
-# usage-observer
-Windows desktop widget for local Codex and DSH usage, quota resets, balances and private-LAN summaries.
+# UsageObserver
+
+Windows 10/11 x64 的 Codex 与 DeepSeek DSH 用量浮窗。第三方本地工具。
+
+- 显示本机 Codex 账号额度、服务器返回的重置时间和日志 token。
+- 显示 DSH 当前登录账户的余额、今日 token 和自定义提醒。
+- 可拖动浮窗、悬停详情、任务栏图标和按用户设置开机启动。
+- 同一专用局域网内发现设备，配对后加密交换用量摘要。
+- 公开 GitHub Releases 提供联网电脑的一键程序更新。
+
+程序读取每台电脑已有的登录，不登录、退出或复制账户凭据；不创建模型任务。同一账号额度/余额是共享快照，不相加。日志 token 表示所选目录的本机记录，不能换算某台机器消耗的账号额度百分点。
+
+安装包将发布在 [Releases](https://github.com/lys20001205/usage-observer/releases)。首次安装后，浮窗右键 → 检查程序更新 → 检查并更新。新版默认使用本仓库，无需手填地址。此功能需要目标电脑可以访问 GitHub。
+
+更新保留本机数据库、记录起点、路径设置、提醒、手动暂停、开机启动和配对信息。下载校验 GitHub 提供的 SHA-256 与大小；安装前检查内置 manifest，替换失败尝试恢复旧文件。程序文件和数据目录分离：
+
+- 程序：`%LOCALAPPDATA%\Programs\UsageObserver`
+- 数据：`%LOCALAPPDATA%\UsageObserver`
+
+局域网汇总需要在每台电脑安装并运行，同组配对；它不提供跨外网用量汇总，也不能追溯未安装设备的历史使用。DSH 监控当前 deepseek-account 登录，不包括其他 API Key 客户端的调用。余额净变化不是逐笔账单。
+
+安装包包含运行时和第三方许可文件，不包含开发电脑的账户、用量记录、配对码、日志或审计材料。Windows 程序尚未做代码签名。新版本先在隔离安装目录验证升级、保留配置和回滚；无法保证所有账户或供应商版本兼容。
