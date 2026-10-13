@@ -232,11 +232,11 @@ namespace CodexUsageTray
             AutoScroll=true;AutoScrollMinSize=new Size(640,584);
             VisualTheme.Text(this,"重置预告",24,18,340,35,20,VisualTheme.Ink,true);
             VisualTheme.Text(this,"CODEX  /  全局公告追踪",26,57,380,23,8,VisualTheme.Muted);
-            var hero=VisualTheme.Card(this,24,94,592,159,VisualTheme.Night);
+            var hero=VisualTheme.Card(this,24,94,592,159,VisualTheme.Night,true);
             phase=VisualTheme.Text(hero,"等待公告",20,17,552,23,9,VisualTheme.Mint);
-            time=VisualTheme.Text(hero,"时间待确认",16,45,556,48,28,Color.White,true);
-            basis=VisualTheme.Text(hero,"北京时间 · 暂无精确时间",20,107,552,34,9,Color.FromArgb(172,194,199));
-            var card=VisualTheme.Card(this,24,269,592,173,Color.White);
+            time=VisualTheme.Text(hero,"时间待确认",16,45,556,48,28,VisualTheme.WidgetText,true);
+            basis=VisualTheme.Text(hero,"北京时间 · 暂无精确时间",20,107,552,34,9,VisualTheme.WidgetMuted);
+            var card=VisualTheme.Card(this,24,269,592,173,VisualTheme.Surface);
             VisualTheme.Text(card,"公告依据",18,14,240,23,10,VisualTheme.Ink,true);
             published=VisualTheme.Text(card,"",18,45,556,22,8.5F,VisualTheme.Muted);
             details=new TextBox{Bounds=new Rectangle(18,74,552,55),Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,BorderStyle=BorderStyle.None,BackColor=Color.White,ForeColor=VisualTheme.Ink,Font=new Font("Segoe UI",11)};card.Controls.Add(details);

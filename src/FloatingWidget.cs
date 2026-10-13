@@ -47,6 +47,7 @@ namespace CodexUsageTray
             StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;BackColor=VisualTheme.Night;
             ClientSize=new Size((int)Math.Round(160*InitialScale),(int)Math.Round(92*InitialScale));
             SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);
+            VisualTheme.Track(this);VisualTheme.ThemeChanged+=OnThemeChanged;
             renderTimer.Tick+=delegate{if(pending||(!glass.Ready&&Visible&&frost.Due)){pending=false;Present();}};renderTimer.Start();
             MouseDown+=delegate(object sender,MouseEventArgs e)
             {
@@ -193,20 +194,20 @@ namespace CodexUsageTray
             g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             var panel=new Rectangle(0,0,Width-1,Height-1);
             using(var path=VisualTheme.Round(panel,(int)Math.Round(8*scale)))
-            using(var fill=new LinearGradientBrush(panel,Color.FromArgb(TintAlpha,32,51,43),Color.FromArgb(TintAlpha,20,33,29),LinearGradientMode.Vertical))
+            using(var fill=new LinearGradientBrush(panel,Color.FromArgb(TintAlpha,VisualTheme.Mix(VisualTheme.Night,VisualTheme.WidgetText,.045F)),Color.FromArgb(TintAlpha,VisualTheme.Night),LinearGradientMode.Vertical))
             {
                 if(!glass.Ready&&frost.Image!=null)
                 {var state=g.Save();try{g.SetClip(path,CombineMode.Intersect);frost.Draw(g,Bounds);}finally{g.Restore(state);}}
                 g.FillPath(fill,path);
             }
-            Color muted=Color.FromArgb(197,214,202);bool fresh=alive&&!stopping&&!snapshot.Stale&&!snapshot.ReadFailed&&!snapshot.QuotaStale&&snapshot.Remaining.HasValue;
+            Color muted=VisualTheme.WidgetMuted;bool fresh=alive&&!stopping&&!snapshot.Stale&&!snapshot.ReadFailed&&!snapshot.QuotaStale&&snapshot.Remaining.HasValue;
             string value=snapshot.Remaining.HasValue?snapshot.Remaining.Value.ToString("0.#")+"%":"—";
             bool tall=h>=176,wide=w>=250;float split=wide?w*.53F:w-70;
             string status=stopping||!alive?"·停":snapshot.QuotaStale||snapshot.Stale||snapshot.ReadFailed?"·旧":!snapshot.Remaining.HasValue?"·待":"";
             TextLine(g,"CODEX"+status,11,muted,p,7,wide?split-p-16:w-p*2,17,false,false);
             using(var state=new SolidBrush(fresh?VisualTheme.Mint:VisualTheme.Warning))g.FillEllipse(state,(wide?split-10:w-16)*scale,13*scale,4*scale,4*scale);
             float numberHeight=tall?Math.Min(75,h*.3F):Math.Min(42,h-59),numberSize=tall?Math.Min(60,42+(h-176)*.15F):Math.Min(34,h*.33F);
-            TextLine(g,value,numberSize,Color.White,p-1,25,wide?split-p-16:split-p+3,numberHeight,false,true);
+            TextLine(g,value,numberSize,VisualTheme.WidgetText,p-1,25,wide?split-p-16:split-p+3,numberHeight,false,true);
             float barY=tall?35+numberHeight:h-31;
             if(wide)
             {
@@ -225,7 +226,7 @@ namespace CodexUsageTray
             }
             float contentW=w-p*2,trackHeight=3*scale;
             using(var path=VisualTheme.Round(new Rectangle((int)(p*scale),(int)(barY*scale),(int)(contentW*scale),(int)trackHeight),(int)Math.Ceiling(trackHeight/2)))
-            using(var track=new SolidBrush(Color.FromArgb(72,168,194,174)))g.FillPath(track,path);
+            using(var track=new SolidBrush(Color.FromArgb(72,VisualTheme.Mint)))g.FillPath(track,path);
             float remaining=snapshot.Remaining.HasValue?(float)Math.Max(0,Math.Min(100,snapshot.Remaining.Value)):0;
             int progressWidth=(int)(contentW*remaining/100*scale);
             if(progressWidth>0)using(var path=VisualTheme.Round(new Rectangle((int)(p*scale),(int)(barY*scale),progressWidth,(int)trackHeight),(int)Math.Ceiling(trackHeight/2)))
@@ -233,9 +234,9 @@ namespace CodexUsageTray
             if(tall&&wide)
             {
                 TextLine(g,"Codex 累计 token",11,muted,p,barY+15,w*.52F-p,18,false,false);
-                TextLine(g,Snapshot.Compact(snapshot.A),h>=270?22:17,Color.White,p,barY+37,w*.52F-p,29,false,true);
+                TextLine(g,Snapshot.Compact(snapshot.A),h>=270?22:17,VisualTheme.WidgetText,p,barY+37,w*.52F-p,29,false,true);
                 TextLine(g,"DSH 今日 token",11,muted,split+12,barY+15,w-split-p-12,18,false,false);
-                TextLine(g,Snapshot.Compact(deepseek.A),h>=270?22:17,Color.White,split+12,barY+37,w-split-p-12,29,false,true);
+                TextLine(g,Snapshot.Compact(deepseek.A),h>=270?22:17,VisualTheme.WidgetText,split+12,barY+37,w-split-p-12,29,false,true);
             }
             else if(tall&&h>=212)
             {
@@ -290,7 +291,8 @@ namespace CodexUsageTray
             }
             SyncGlass();
         }
-        protected override void Dispose(bool disposing){if(disposing){renderTimer.Stop();renderTimer.Dispose();tooltip.Dispose();frost.Dispose();Owner=null;glass.Dispose();}base.Dispose(disposing);}
+        void OnThemeChanged(object sender,EventArgs e){pending=true;if(IsHandleCreated)Present();}
+        protected override void Dispose(bool disposing){if(disposing){VisualTheme.ThemeChanged-=OnThemeChanged;renderTimer.Stop();renderTimer.Dispose();tooltip.Dispose();frost.Dispose();Owner=null;glass.Dispose();}base.Dispose(disposing);}
     }
     internal sealed class FrostedBackground : IDisposable
     {

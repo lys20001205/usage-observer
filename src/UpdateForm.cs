@@ -22,7 +22,7 @@ namespace CodexUsageTray
     }
     internal static class Updates
     {
-        public const string VersionText = "1.0.4.9";
+        public const string VersionText = "1.0.4.10";
         static object Get(Dictionary<string,object> d, string k) { object v; return d.TryGetValue(k,out v)?v:null; }
         internal static WebClient CreateClient()
         {
@@ -93,7 +93,7 @@ namespace CodexUsageTray
             VisualTheme.Text(this,"程序更新",24,20,350,38,21,VisualTheme.Ink,true);
             VisualTheme.Text(this,"从 GitHub 正式版本获取更新",26,63,430,22,8.5F,VisualTheme.Muted);
             Controls.Add(new SurfaceBadge{Text="v"+Updates.VersionText,Bounds=new Rectangle(452,29,116,28),Font=new Font("Segoe UI",10F),ForeColor=VisualTheme.Accent});
-            var card=VisualTheme.Card(this,24,102,544,172,Color.White);
+            var card=VisualTheme.Card(this,24,102,544,172,VisualTheme.Surface);
             VisualTheme.Text(card,"更新仓库",18,15,500,23,9,VisualTheme.Ink);
             repository=new TextBox{Text=Updates.LoadRepository(data),Location=new Point(18,46),Size=new Size(508,29),Font=new Font("Segoe UI",11F)};card.Controls.Add(repository);
             status=VisualTheme.Text(card,"已安装 "+Updates.VersionText+"，可随时检查新版本。",18,91,508,44,9,VisualTheme.Muted);

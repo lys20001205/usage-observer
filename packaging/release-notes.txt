@@ -1,10 +1,12 @@
-## Text visibility and independent frosted widget
+## Theme presets and custom colors
 
-- Set final label fonts before parenting. Prevent secondary DPI resizing from covering reset descriptions, collection status, quota captions and DSH token digits.
-- Provide an independent frosted background when Windows transparency effects are disabled. Keep adjustable tint and crisp text without changing system settings.
-- Process only the widget's local background in memory; do not save screen pixels. Restore normal capture visibility immediately after sampling.
+- Open Theme and Colors from the widget context menu or Display and Alerts.
+- Choose Forest, Ocean, Violet or Graphite; customize six colors using a color picker or #RRGGBB input.
+- Preview the dashboard and widget together, save for restart persistence, cancel to restore the previous palette, or preview and save the default theme.
+- Match main interface text to its background without changing fonts or DPI layout.
+- Keep the independent frosted background and adjustable transparency without changing Windows settings.
 - Retain records, pairing, account paths, manual pause, widget size and transparency preferences.
 - Keep UTF-8 update decoding and ASCII release metadata for old-client compatibility.
 
-Validation includes continuous native dashboard refresh, nine complete text regions, actual blur against generated background patterns, focus preservation and isolated upgrade retention.
+Validation includes repeated theme changes without geometry drift, native editor text visibility, custom color persistence, cancellation, default restoration, malformed-file recovery, independent blur and isolated upgrade retention.
 Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.

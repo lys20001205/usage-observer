@@ -190,7 +190,7 @@ namespace CodexUsageTray
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.Clear(BackColor);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using(var track=VisualTheme.Round(new Rectangle(0,0,Width-1,Height),Height/2))using(var brush=new SolidBrush(Color.FromArgb(62,90,72)))e.Graphics.FillPath(brush,track);
+            using(var track=VisualTheme.Round(new Rectangle(0,0,Width-1,Height),Height/2))using(var brush=new SolidBrush(VisualTheme.Mix(VisualTheme.Night,VisualTheme.Mint,.25F)))e.Graphics.FillPath(brush,track);
             int filled=Width*value/1000;
             if(filled>0)using(var path=VisualTheme.Round(new Rectangle(0,0,filled,Height),Height/2))using(var brush=new SolidBrush(VisualTheme.Mint))e.Graphics.FillPath(brush,path);
         }
@@ -206,7 +206,7 @@ namespace CodexUsageTray
         public readonly SurfaceSlider BackgroundTransparency;
         readonly Label transparencyValue;
         public readonly NumericUpDown LowThreshold, DailyThreshold;
-        public readonly Button SaveAlerts, TestAlert, DeepSeekReport;
+        public readonly Button SaveAlerts, TestAlert, DeepSeekReport,ThemeColors;
         readonly Label dsBalance, dsDetails, dsTokens, dsHealth, dsSince, lowLabel, dailyLabel;
         readonly Label announcementLabel;
         readonly ToolTip detailTips=new ToolTip{AutoPopDelay=15000};
@@ -220,13 +220,13 @@ namespace CodexUsageTray
             AddTo(this,"用量总览",24,21,340,38,21,VisualTheme.Ink,true);
             AddLabel("CODEX  /  DEEPSEEK",26,61,320,20,8.5F,VisualTheme.Muted);
             headline=new SurfaceBadge{Text="等待数据",Bounds=new Rectangle(484,30,112,28),Font=new Font("Microsoft YaHei UI",8.5F),ForeColor=VisualTheme.Accent};Controls.Add(headline);
-            var hero=VisualTheme.Card(this,24,96,572,164,VisualTheme.Night);
+            var hero=VisualTheme.Card(this,24,96,572,164,VisualTheme.Night,true);
             AddTo(hero,"CODEX",20,17,220,22,9,VisualTheme.Mint);
-            amount=VisualTheme.Number(hero,"—",15,42,244,64,43,Color.White);
-            usage=AddTo(hero,"等待额度快照",21,114,242,18,8.5F,Color.FromArgb(183,207,188));
+            amount=VisualTheme.Number(hero,"—",15,42,244,64,43,VisualTheme.WidgetText);
+            usage=AddTo(hero,"等待额度快照",21,114,242,18,8.5F,VisualTheme.WidgetMuted);
             quota=new QuotaBar{Bounds=new Rectangle(22,140,236,5),BackColor=VisualTheme.Night};hero.Controls.Add(quota);
-            AddTo(hero,"周期重置",296,17,250,21,8.5F,Color.FromArgb(183,207,188));
-            reset=AddTo(hero,"重置时间待获取",296,43,252,40,9,Color.White);
+            AddTo(hero,"周期重置",296,17,250,21,8.5F,VisualTheme.WidgetMuted);
+            reset=AddTo(hero,"重置时间待获取",296,43,252,40,9,VisualTheme.WidgetText);
             announcementLabel=AddTo(hero,"全局预告 · 等待检查",296,87,252,36,8.5F,VisualTheme.Mint);
             ResetAnnouncements=VisualTheme.Button(hero,"重置预告  ↗",294,122,258,delegate{});
             AddTo(this,"记录概览",26,281,320,23,10,VisualTheme.Ink,true);
@@ -241,7 +241,7 @@ namespace CodexUsageTray
             hint=AddLabel("等待第一次采样",26,436,570,34,8.5F,VisualTheme.Muted);
             updated=AddLabel("",26,468,282,20,8,VisualTheme.Muted);
             started=AddLabel("",318,468,278,20,8,VisualTheme.Muted);started.TextAlign=ContentAlignment.TopRight;
-            var ds=VisualTheme.Card(this,24,508,572,132,Color.White);
+            var ds=VisualTheme.Card(this,24,508,572,132,VisualTheme.Surface);
             AddTo(ds,"DEEPSEEK · 账户余额",18,14,260,21,8.5F,VisualTheme.Muted);
             AddTo(ds,BackendSource.Legacy?"今日 DSH token · A / B":"今日 DSH token · 本机",308,14,240,21,8.5F,VisualTheme.Muted);
             dsBalance=VisualTheme.Number(ds,"—",14,34,270,48,26,VisualTheme.Accent);
@@ -254,15 +254,16 @@ namespace CodexUsageTray
             preferences.Text="UsageObserver · 显示与提醒";preferences.ClientSize=new Size(592,524);preferences.Font=Font;preferences.BackColor=VisualTheme.Canvas;preferences.FormBorderStyle=FormBorderStyle.FixedDialog;preferences.MaximizeBox=false;preferences.MinimizeBox=false;preferences.StartPosition=FormStartPosition.CenterParent;preferences.AutoScaleDimensions=new SizeF(96,96);preferences.AutoScaleMode=AutoScaleMode.Dpi;
             Preferences=preferences;preferences.AutoScroll=true;preferences.AutoScrollMinSize=new Size(580,524);
             AddTo(preferences,"显示与提醒",24,19,360,37,19,VisualTheme.Ink,true);
-            AddTo(preferences,"外观即时保存 · 提醒阈值单独保存",26,59,540,22,8.5F,VisualTheme.Muted);
-            var display=VisualTheme.Card(preferences,24,98,544,176,Color.White);
+            AddTo(preferences,"外观即时保存 · 提醒阈值单独保存",26,59,386,22,8.5F,VisualTheme.Muted);
+            ThemeColors=VisualTheme.Button(preferences,"主题与调色  ↗",432,52,136,delegate{});
+            var display=VisualTheme.Card(preferences,24,98,544,176,VisualTheme.Surface);
             ShowWidget=new SurfaceToggle{Text="桌面浮窗",Bounds=new Rectangle(18,16,508,29),Font=new Font("Microsoft YaHei UI",10F),ForeColor=VisualTheme.Ink};display.Controls.Add(ShowWidget);
             AddTo(display,"背景透明度",18,68,188,23,9,VisualTheme.Ink);
             transparencyValue=new SurfaceBadge{Text="60%",Bounds=new Rectangle(458,64,68,27),Font=new Font("Segoe UI",10F),ForeColor=VisualTheme.Accent};display.Controls.Add(transparencyValue);
-            BackgroundTransparency=new SurfaceSlider{Bounds=new Rectangle(10,102,526,32),Minimum=0,Maximum=90,Value=60,BackColor=Color.White,SmallChange=1,LargeChange=10};display.Controls.Add(BackgroundTransparency);
+            BackgroundTransparency=new SurfaceSlider{Bounds=new Rectangle(10,102,526,32),Minimum=0,Maximum=90,Value=60,BackColor=VisualTheme.Surface,SmallChange=1,LargeChange=10};display.Controls.Add(BackgroundTransparency);
             BackgroundTransparency.ValueChanged+=delegate{transparencyValue.Text=BackgroundTransparency.Value+"%";};
             AddTo(display,"更实",18,141,90,20,8,VisualTheme.Muted);var clear=AddTo(display,"更透 · 文字保持清晰",350,141,176,20,8,VisualTheme.Muted);clear.TextAlign=ContentAlignment.TopRight;
-            var alerts=VisualTheme.Card(preferences,24,288,544,155,Color.White);
+            var alerts=VisualTheme.Card(preferences,24,288,544,155,VisualTheme.Surface);
             Alerts=new SurfaceToggle{Text="DeepSeek 用量提醒",Bounds=new Rectangle(18,14,508,29),Font=new Font("Microsoft YaHei UI",10F),ForeColor=VisualTheme.Ink};alerts.Controls.Add(Alerts);
             lowLabel=AddTo(alerts,"低余额（元）",18,58,150,22,8.5F,VisualTheme.Muted);
             LowThreshold=new NumericUpDown{Bounds=new Rectangle(18,85,150,28),DecimalPlaces=2,Maximum=100000,Value=20,Font=new Font("Segoe UI",11F)};alerts.Controls.Add(LowThreshold);
@@ -286,7 +287,7 @@ namespace CodexUsageTray
         }
         Label AddLabel(string text,int x,int y,int w,int h,float size,Color color){return AddTo(this,text,x,y,w,h,size,color);}
         static Label AddTo(Control parent,string text,int x,int y,int w,int h,float size,Color color,bool bold=false){return VisualTheme.Text(parent,text,x,y,w,h,size,color,bold);}
-        Panel Card(int x,int y){return VisualTheme.Card(this,x,y,278,104,Color.White);}
+        Panel Card(int x,int y){return VisualTheme.Card(this,x,y,278,104,VisualTheme.Surface);}
         Button AddButton(string text,int x,int y,int w,Action action){return VisualTheme.Button(this,text,x,y,w,action);}
         public void UpdateAnnouncement(ResetMonitor monitor)
         {
@@ -298,7 +299,7 @@ namespace CodexUsageTray
         {
             reset.Text = s.ResetDetail;
             headline.Text = s.State(alive, stopping);
-            headline.ForeColor = headline.Text == "正在记录" ? Color.FromArgb(30, 120, 86) : Color.FromArgb(154, 97, 20);
+            VisualTheme.BindForeground(headline,headline.Text=="正在记录"?"Accent":"Warning");
             amount.Text = s.Remaining.HasValue ? s.Remaining.Value.ToString("0.#") + "%" : "—";
             usage.Text = s.Used.HasValue ? "已使用 " + s.Used.Value.ToString("0.#") + "%" : "额度读取失败";
             if (s.Stale || s.ReadFailed || s.QuotaStale || !alive) usage.Text += " · 上次快照";
@@ -318,7 +319,7 @@ namespace CodexUsageTray
         static string FormatTime(DateTimeOffset t) { return t == DateTimeOffset.MinValue ? "—" : t.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"); }
         public void UpdateDeepSeek(DeepSeekSnapshot s)
         {
-            dsBalance.Text = s.Money(s.Balance);dsBalance.ForeColor=s.Stale?VisualTheme.Muted:VisualTheme.Accent;
+            dsBalance.Text = s.Money(s.Balance);VisualTheme.BindForeground(dsBalance,s.Stale?"Muted":"Accent");
             detailTips.SetToolTip(dsBalance,"账户余额 "+s.Money(s.Balance)+(s.Stale?" · 上次结果":""));
             dsDetails.Text = "充值 "+s.Money(s.ToppedUp)+" · 赠送 "+s.Money(s.Granted)+"\n记录期净减少 "+s.Money(s.Decrease);
             dsTokens.Text=BackendSource.Legacy?Snapshot.Compact(s.A)+" / "+Snapshot.Compact(s.B):s.A.ToString("N0");
@@ -338,6 +339,7 @@ namespace CodexUsageTray
         readonly FloatingWidget widget;
         readonly ResetMonitor resets;
         ResetForm resetWindow;
+        ThemeForm themeWindow;
         readonly WidgetSettings settings;
         readonly StartupSetting startup;
         readonly ToolStripMenuItem startupItem, widgetItem;
@@ -362,7 +364,7 @@ namespace CodexUsageTray
             window = new Dashboard(Toggle, delegate { OpenFile("report.md"); }, delegate { OpenFile(""); });
             widget = new FloatingWidget(ShowWindow, delegate(Point point) { settings.X = point.X; settings.Y = point.Y; SaveSettings(); }, delegate(Size size) {settings.WidgetWidth=size.Width;settings.WidgetHeight=size.Height;SaveSettings();}); widget.Place(settings);
             resets=new ResetMonitor(root);
-            var menu = new ContextMenuStrip { BackColor=Color.White, ForeColor=VisualTheme.Ink, Font=new Font("Microsoft YaHei UI",9F), ShowImageMargin=false };
+            var menu = new ContextMenuStrip { BackColor=VisualTheme.Surface, ForeColor=VisualTheme.Readable(VisualTheme.Ink,VisualTheme.Surface),Renderer=new ThemeMenuRenderer(),Font=new Font("Microsoft YaHei UI",9F), ShowImageMargin=false };
             menu.Items.Add("打开用量面板", null, delegate { ShowWindow(); });
             menu.Items.Add("恢复桌面浮窗", null, delegate { SetWidgetVisible(true); widget.EnsurePresentation(true); });
             transparencyMenu=new ToolStripMenuItem("背景透明度");menu.Items.Add(transparencyMenu);
@@ -370,6 +372,8 @@ namespace CodexUsageTray
             {int choice=percent;var item=new ToolStripMenuItem(choice+"%",null,delegate{SetTransparency(choice);});item.Tag=choice;transparencyMenu.DropDownItems.Add(item);}
             transparencyMenu.DropDownItems.Add(new ToolStripSeparator());
             transparencyMenu.DropDownItems.Add("自定义透明度",null,delegate{window.Preferences.Show();});
+            menu.Items.Add("主题与调色",null,delegate{ShowThemeWindow();});
+            window.ThemeColors.Click+=delegate{ShowThemeWindow();};
             menu.Items.Add("全局重置预告与提醒", null, delegate { ShowResetWindow(); });
             window.ResetAnnouncements.Click+=delegate {ShowResetWindow();};
             menu.Items.Add("局域网设备与账号设置", null, delegate { new NetworkForm(root).Show(); });
@@ -416,6 +420,7 @@ namespace CodexUsageTray
         }
         void ShowWindow() { window.Show(); window.WindowState = FormWindowState.Normal; window.Activate(); }
         void ShowResetWindow() {if(resetWindow==null||resetWindow.IsDisposed)resetWindow=new ResetForm(resets);resetWindow.Show();}
+        void ShowThemeWindow(){if(themeWindow==null||themeWindow.IsDisposed)themeWindow=new ThemeForm(root);themeWindow.Show(window.Visible?window:null);}
         void SaveSettings() { try { settings.Save(root); } catch (Exception e) { File.AppendAllText(Path.Combine(root, "tray-errors.log"), "Settings: " + e.Message + Environment.NewLine); } }
         void SyncSettings()
         {
@@ -487,7 +492,7 @@ namespace CodexUsageTray
             if (notification != null && alive && !stopping) { SaveSettings(); tray.ShowBalloonTip(8000, "DeepSeek 用量提醒", notification, ToolTipIcon.Warning); File.AppendAllText(Path.Combine(root, "notifications.log"), DateTimeOffset.Now.ToString("o") + " " + notification + Environment.NewLine, Encoding.UTF8); }
             SyncSettings();
             window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
-            string state = new JavaScriptSerializer().Serialize(new { pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
+            string state = new JavaScriptSerializer().Serialize(new { pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
             if (state != publishedStatus)
             {
                 try { File.WriteAllText(Path.Combine(root, "tray-status.json"), state, Encoding.UTF8); publishedStatus = state; } catch { }
@@ -512,6 +517,7 @@ namespace CodexUsageTray
             settings.X = widget.Left; settings.Y = widget.Top;settings.WidgetWidth=widget.LogicalSize.Width;settings.WidgetHeight=widget.LogicalSize.Height;SaveSettings();
             timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); widget.Dispose(); window.Dispose(); appIcon.Dispose();
             resets.Dispose();if(resetWindow!=null&&!resetWindow.IsDisposed)resetWindow.Dispose();
+            if(themeWindow!=null&&!themeWindow.IsDisposed)themeWindow.Dispose();
             try { File.Delete(Path.Combine(root, "tray-status.json")); } catch { }
             base.ExitThreadCore();
         }
@@ -538,6 +544,7 @@ namespace CodexUsageTray
         {
             string root = Paths.Data; Directory.CreateDirectory(root);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            VisualTheme.ApplyTheme(ThemeSettings.Load(root));
             if (args.Length > 0 && args[0] == "--self-test") return SelfTest(root, args.Length > 1 ? args[1] : null);
             if(args.Length>1&&args[0]=="--composition-test")return CompositionValidation.Run(args[1]);
             if (args.Length > 0 && args[0] == "--quit-ui")

@@ -1,7 +1,7 @@
 ﻿param([string]$OutputDirectory)
 $ErrorActionPreference='Stop'
 $repoRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$version='1.0.4.9'
+$version='1.0.4.10'
 $buildRoot=Join-Path $repoRoot ('work\release-'+$version)
 New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
 if(!$OutputDirectory){$OutputDirectory=Join-Path $buildRoot 'artifacts'}
@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 # text ASCII until all supported clients explicitly decode UTF-8.
 $releaseBody=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'release-notes.txt'),[Text.Encoding]::UTF8)
 if($releaseBody -match '[^\x00-\x7F]'){throw 'Release notes must remain ASCII for old-updater compatibility'}
-@{tag_name=('v'+$version);name=('UsageObserver '+$version+' - Text visibility and independent frost');body=$releaseBody;draft=$true;prerelease=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'release-metadata.json') -Encoding ASCII
+@{tag_name=('v'+$version);name=('UsageObserver '+$version+' - Theme presets and custom colors');body=$releaseBody;draft=$true;prerelease=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'release-metadata.json') -Encoding ASCII
 $baseline=Join-Path $buildRoot 'UsageObserver-Setup-1.0.4.1.exe'
 if(!(Test-Path -LiteralPath $baseline)){Invoke-WebRequest -Uri 'https://github.com/lys20001205/usage-observer/releases/download/v1.0.4.1/UsageObserver-Setup.exe' -OutFile $baseline -TimeoutSec 120}
 if((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash -ne '6B172C478B81D98E5E273BB603A6F70A67D33A461DAD13C2D9C4DAC1E9AA1BE9'){throw 'Baseline installer SHA-256 mismatch'}
@@ -44,7 +44,7 @@ $text=[regex]::Replace($text,"(?m)^\s*\`$shortcutPath=Join-Path .*?$",'        $
 $entries=@()
 foreach($file in Get-ChildItem -LiteralPath $app -File -Recurse){
  $relative=$file.FullName.Substring($app.Length+1).Replace('\','/')
- if($relative -match '(?i)(^|/)(ui-settings|connection-settings|device-id|lan-key|status|monitor.pid|token.*\.jsonl|\.credentials|usage.*\.db)' -or $relative -match '(?i)(^|/)(__pycache__|\.git)(/|$)'){throw ('Unexpected local data: '+$relative)}
+ if($relative -match '(?i)(^|/)(theme-settings|ui-settings|connection-settings|device-id|lan-key|status|monitor.pid|token.*\.jsonl|\.credentials|usage.*\.db)' -or $relative -match '(?i)(^|/)(__pycache__|\.git)(/|$)'){throw ('Unexpected local data: '+$relative)}
  $entries+=@{path=$relative;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 @{product='UsageObserver';version=$version;platform='Windows 10/11 x64';files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $stage 'manifest.json') -Encoding UTF8
