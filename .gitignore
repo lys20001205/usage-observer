@@ -1,0 +1,4 @@
+work/
+src/*.exe
+src/*.pdb
+*.user
