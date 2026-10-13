@@ -1,10 +1,10 @@
-## Layout and transparency fixes
+## Text visibility and independent frosted widget
 
-- Fix live redraw artifacts in the display switches and transparency slider. Repeated setting changes no longer replay text or slider graphics in other controls.
-- Defer dashboard and preferences DPI scaling until their controls have been created. Restore consistent spacing at 125% scaling and separate the large quota number from its usage caption.
-- When Windows transparency effects are disabled, use real per-pixel alpha transparency instead of displaying an opaque black blur window. Text stays opaque; system preferences remain unchanged.
-- Retain UTF-8 update decoding, ASCII release metadata for old-updater compatibility, records, pairing, account paths, pause and reminder settings.
+- Set final label fonts before parenting. Prevent secondary DPI resizing from covering reset descriptions, collection status, quota captions and DSH token digits.
+- Provide an independent frosted background when Windows transparency effects are disabled. Keep adjustable tint and crisp text without changing system settings.
+- Process only the widget's local background in memory; do not save screen pixels. Restore normal capture visibility immediately after sampling.
+- Retain records, pairing, account paths, manual pause, widget size and transparency preferences.
+- Keep UTF-8 update decoding and ASCII release metadata for old-client compatibility.
 
-Existing users: use Check and Update. Manual installation: download and run UsageObserver-Setup.exe.
-Validation covers native 125% redraw, actual background pixels at 78% transparency, focus preservation and isolated upgrade retention.
-Chinese usage documentation remains in the repository README.
+Validation includes continuous native dashboard refresh, nine complete text regions, actual blur against generated background patterns, focus preservation and isolated upgrade retention.
+Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.

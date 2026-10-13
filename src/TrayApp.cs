@@ -217,7 +217,7 @@ namespace CodexUsageTray
             Text="UsageObserver · 用量总览";ClientSize=new Size(620,Math.Min(736,Screen.PrimaryScreen.WorkingArea.Height-60));FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
             StartPosition=FormStartPosition.CenterScreen;BackColor=VisualTheme.Canvas;ForeColor=VisualTheme.Ink;Font=new Font("Microsoft YaHei UI",9F);AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;
             AutoScroll=true;AutoScrollMinSize=new Size(600,736);
-            AddLabel("用量总览",24,21,340,38,21,VisualTheme.Ink).Font=new Font("Microsoft YaHei UI",21,FontStyle.Bold);
+            AddTo(this,"用量总览",24,21,340,38,21,VisualTheme.Ink,true);
             AddLabel("CODEX  /  DEEPSEEK",26,61,320,20,8.5F,VisualTheme.Muted);
             headline=new SurfaceBadge{Text="等待数据",Bounds=new Rectangle(484,30,112,28),Font=new Font("Microsoft YaHei UI",8.5F),ForeColor=VisualTheme.Accent};Controls.Add(headline);
             var hero=VisualTheme.Card(this,24,96,572,164,VisualTheme.Night);
@@ -229,14 +229,13 @@ namespace CodexUsageTray
             reset=AddTo(hero,"重置时间待获取",296,43,252,40,9,Color.White);
             announcementLabel=AddTo(hero,"全局预告 · 等待检查",296,87,252,36,8.5F,VisualTheme.Mint);
             ResetAnnouncements=VisualTheme.Button(hero,"重置预告  ↗",294,122,258,delegate{});
-            AddLabel("记录概览",26,281,320,23,10,VisualTheme.Ink).Font=new Font("Microsoft YaHei UI",10,FontStyle.Bold);
+            AddTo(this,"记录概览",26,281,320,23,10,VisualTheme.Ink,true);
             AddButton("设备与账号  ↗",454,274,142,delegate{new NetworkForm(Paths.Data).Show();});
             Panel a=Card(24,322),b=Card(318,322);
             AddTo(a,"本机 Codex · 累计 token",18,13,242,20,8.5F,VisualTheme.Muted);
             AddTo(b,BackendSource.Legacy?"DENGPC · 累计 token":"局域网",18,13,242,20,8.5F,VisualTheme.Muted);
             aTokens=VisualTheme.Number(a,"0",15,34,245,43,22,VisualTheme.Ink);
-            bTokens=VisualTheme.Number(b,"0",15,34,245,43,22,VisualTheme.Ink);
-            if(!BackendSource.Legacy)bTokens.Font=new Font("Microsoft YaHei UI",13F);
+            bTokens=BackendSource.Legacy?VisualTheme.Number(b,"0",15,34,245,43,22,VisualTheme.Ink):AddTo(b,"设备用量",15,34,245,43,13,VisualTheme.Ink);
             aHealth=AddTo(a,"等待数据",18,76,242,19,8.5F,VisualTheme.Muted);
             bHealth=AddTo(b,"等待数据",18,76,242,19,8.5F,VisualTheme.Muted);
             hint=AddLabel("等待第一次采样",26,436,570,34,8.5F,VisualTheme.Muted);
@@ -488,7 +487,7 @@ namespace CodexUsageTray
             if (notification != null && alive && !stopping) { SaveSettings(); tray.ShowBalloonTip(8000, "DeepSeek 用量提醒", notification, ToolTipIcon.Warning); File.AppendAllText(Path.Combine(root, "notifications.log"), DateTimeOffset.Now.ToString("o") + " " + notification + Environment.NewLine, Encoding.UTF8); }
             SyncSettings();
             window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
-            string state = new JavaScriptSerializer().Serialize(new { pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
+            string state = new JavaScriptSerializer().Serialize(new { pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
             if (state != publishedStatus)
             {
                 try { File.WriteAllText(Path.Combine(root, "tray-status.json"), state, Encoding.UTF8); publishedStatus = state; } catch { }

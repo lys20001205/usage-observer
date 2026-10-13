@@ -17,11 +17,12 @@ namespace CodexUsageTray
         internal static float Scale(Control control){using(var g=control.CreateGraphics())return g.DpiX/96F;}
         internal static Label Text(Control parent,string text,int x,int y,int w,int h,float size,Color color,bool bold=false)
         {
-            var label=new Label{Text=text,Bounds=new Rectangle(x,y,w,h),Font=new Font("Microsoft YaHei UI",size,bold?FontStyle.Bold:FontStyle.Regular),ForeColor=color,BackColor=Color.Transparent,UseCompatibleTextRendering=false};parent.Controls.Add(label);return label;
+            var label=new Label{Font=new Font("Microsoft YaHei UI",size,bold?FontStyle.Bold:FontStyle.Regular),Text=text,ForeColor=color,BackColor=Color.Transparent,UseCompatibleTextRendering=false,Bounds=new Rectangle(x,y,w,h)};parent.Controls.Add(label);return label;
         }
         internal static Label Number(Control parent,string text,int x,int y,int w,int h,float size,Color color)
         {
-            var label=Text(parent,text,x,y,w,h,size,color);label.Font=new Font("Segoe UI",size,FontStyle.Regular);return label;
+            // Set the final font before parenting, preventing a second DPI size adjustment.
+            var label=new Label{Font=new Font("Segoe UI",size,FontStyle.Regular),Text=text,ForeColor=color,BackColor=Color.Transparent,UseCompatibleTextRendering=false,Bounds=new Rectangle(x,y,w,h)};parent.Controls.Add(label);return label;
         }
         internal static Panel Card(Control parent,int x,int y,int w,int h,Color fill)
         {

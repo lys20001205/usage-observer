@@ -59,7 +59,7 @@ namespace CodexUsageTray
     {
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("dwmapi.dll")] static extern int DwmFlush();
-        static void Settle(){for(int i=0;i<12;i++){Application.DoEvents();Thread.Sleep(20);}DwmFlush();}
+        static void Settle(){for(int i=0;i<20;i++){Application.DoEvents();Thread.Sleep(25);}DwmFlush();}
         static Bitmap Capture(Rectangle bounds){var bmp=new Bitmap(bounds.Width,bounds.Height);using(var g=Graphics.FromImage(bmp))g.CopyFromScreen(bounds.Location,Point.Empty,bounds.Size);return bmp;}
         static double Distance(Color a,Color b){return (Math.Abs(a.R-b.R)+Math.Abs(a.G-b.G)+Math.Abs(a.B-b.B))/3.0;}
         static double Variation(Bitmap bmp,Rectangle area)
@@ -76,8 +76,8 @@ namespace CodexUsageTray
             {
                 // This diagnostic shows only a generated local pattern; it never activates a window or injects input.
                 widget.ApplyLogicalSize(new Size(320,220));
-                canvas.Bounds=new Rectangle(area.Left+24,area.Bottom-widget.Height-40,widget.Width+48,widget.Height+28);canvas.Show();
-                widget.Location=new Point(canvas.Left+24,canvas.Top+14);
+                canvas.Bounds=new Rectangle(area.Left+24,area.Bottom-widget.Height-112,widget.Width+96,widget.Height+96);canvas.Show();
+                widget.Location=new Point(canvas.Left+48,canvas.Top+48);
                 widget.UpdateSnapshot(new Snapshot{Remaining=74,A=1290023,Running=true,Stale=false,AHealth="ok",BHealth="ok"},true,false);
                 widget.UpdateDeepSeek(new DeepSeekSnapshot{Balance=100m,A=123456,Stale=false});widget.SetTransparency(78);widget.Show();Settle();
                 Rectangle crop=widget.Bounds;int sampleX=(int)(160*widget.RenderScale),sampleY=(int)(178*widget.RenderScale);
@@ -97,7 +97,7 @@ namespace CodexUsageTray
                 widget.Hide();Settle();
                 using(var bmp=Capture(crop)){bmp.Save(Path.Combine(output,"unblurred-checker.png"));plainVariation=Variation(bmp,sample);cornerError=Distance(blurredCorner,bmp.GetPixel(0,0));}
                 bool preserved=GetForegroundWindow()==foreground;
-                var evidence=new{background_response=Distance(first,second),transparency_response=Distance(opaque,transparent),corner_error=cornerError,blur_variation=blurVariation,unblurred_variation=plainVariation,foreground_preserved=preserved,material_request_succeeded=widget.FrostedReady};
+                var evidence=new{background_response=Distance(first,second),transparency_response=Distance(opaque,transparent),corner_error=cornerError,blur_variation=blurVariation,unblurred_variation=plainVariation,foreground_preserved=preserved,material_initialized=widget.FrostedReady,material_mode=widget.FrostedMode};
                 File.WriteAllText(Path.Combine(output,"composition-validation.json"),new JavaScriptSerializer().Serialize(evidence));
                 bool materialValid=widget.FrostedReady?blurVariation<plainVariation*.35:blurVariation>plainVariation*.45&&blurVariation<plainVariation*.75;
                 return evidence.background_response>15&&evidence.transparency_response>15&&cornerError<3&&plainVariation>3&&materialValid&&preserved?0:1;

@@ -22,6 +22,7 @@ namespace CodexUsageTray
         internal void SetTransparency(int percent){transparency=ClampTransparency(percent);pending=true;if(IsHandleCreated)Present();}
         readonly Action open;readonly Action<Point> savePosition;readonly Action<Size> saveSize;
         readonly GlassBackdrop glass=new GlassBackdrop();
+        readonly FrostedBackground frost=new FrostedBackground();
         readonly Timer renderTimer=new Timer{Interval=16};
         readonly ToolTip tooltip=new ToolTip{InitialDelay=400,ReshowDelay=200,AutoPopDelay=12000};
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -29,8 +30,9 @@ namespace CodexUsageTray
         [DllImport("user32.dll")] static extern bool AreDpiAwarenessContextsEqual(IntPtr first,IntPtr second);
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref uint value,int size);
         internal int FramePolicyResult,BorderPolicyResult;internal bool LayeredRenderSucceeded;
-        internal bool FrostedReady {get{return glass.Ready;}}
-        internal int MaterialResult {get{return glass.MaterialResult;}}
+        internal bool FrostedReady {get{return glass.Ready||frost.Image!=null;}}
+        internal int MaterialResult {get{return glass.Ready?glass.MaterialResult:frost.Image!=null?0:glass.MaterialResult;}}
+        internal string FrostedMode {get{return glass.Ready?"native":frost.Image!=null?"software":"alpha";}}
         internal bool PerMonitorAware {get{try{return IsHandleCreated&&AreDpiAwarenessContextsEqual(GetWindowDpiAwarenessContext(Handle),new IntPtr(-4));}catch(EntryPointNotFoundException){return false;}}}
         internal float RenderScale {get{try{return IsHandleCreated?Math.Max(1,GetDpiForWindow(Handle)/96F):InitialScale;}catch(EntryPointNotFoundException){return InitialScale;}}}
         static float InitialScale {get{using(var g=Graphics.FromHwnd(IntPtr.Zero))return Math.Max(1,g.DpiX/96F);}}
@@ -45,7 +47,7 @@ namespace CodexUsageTray
             StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;BackColor=VisualTheme.Night;
             ClientSize=new Size((int)Math.Round(160*InitialScale),(int)Math.Round(92*InitialScale));
             SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);
-            renderTimer.Tick+=delegate{if(pending){pending=false;Present();}};renderTimer.Start();
+            renderTimer.Tick+=delegate{if(pending||(!glass.Ready&&Visible&&frost.Due)){pending=false;Present();}};renderTimer.Start();
             MouseDown+=delegate(object sender,MouseEventArgs e)
             {
                 if(e.Button!=MouseButtons.Left)return;
@@ -192,7 +194,11 @@ namespace CodexUsageTray
             var panel=new Rectangle(0,0,Width-1,Height-1);
             using(var path=VisualTheme.Round(panel,(int)Math.Round(8*scale)))
             using(var fill=new LinearGradientBrush(panel,Color.FromArgb(TintAlpha,32,51,43),Color.FromArgb(TintAlpha,20,33,29),LinearGradientMode.Vertical))
-            {g.FillPath(fill,path);}
+            {
+                if(!glass.Ready&&frost.Image!=null)
+                {var state=g.Save();try{g.SetClip(path,CombineMode.Intersect);frost.Draw(g,Bounds);}finally{g.Restore(state);}}
+                g.FillPath(fill,path);
+            }
             Color muted=Color.FromArgb(197,214,202);bool fresh=alive&&!stopping&&!snapshot.Stale&&!snapshot.ReadFailed&&!snapshot.QuotaStale&&snapshot.Remaining.HasValue;
             string value=snapshot.Remaining.HasValue?snapshot.Remaining.Value.ToString("0.#")+"%":"—";
             bool tall=h>=176,wide=w>=250;float split=wide?w*.53F:w-70;
@@ -274,6 +280,7 @@ namespace CodexUsageTray
         void Present()
         {
             if(!IsHandleCreated||Width<=0||Height<=0)return;
+            if(!glass.Ready&&Visible)frost.Refresh(this);
             using(var bitmap=new Bitmap(Width,Height,System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
             {
                 using(var g=Graphics.FromImage(bitmap))PaintContent(g);
@@ -283,6 +290,61 @@ namespace CodexUsageTray
             }
             SyncGlass();
         }
-        protected override void Dispose(bool disposing){if(disposing){renderTimer.Stop();renderTimer.Dispose();tooltip.Dispose();Owner=null;glass.Dispose();}base.Dispose(disposing);}
+        protected override void Dispose(bool disposing){if(disposing){renderTimer.Stop();renderTimer.Dispose();tooltip.Dispose();frost.Dispose();Owner=null;glass.Dispose();}base.Dispose(disposing);}
+    }
+    internal sealed class FrostedBackground : IDisposable
+    {
+        [DllImport("user32.dll")]static extern bool SetWindowDisplayAffinity(IntPtr hwnd,uint affinity);
+        [DllImport("user32.dll")]static extern bool GetWindowDisplayAffinity(IntPtr hwnd,out uint affinity);
+        Bitmap image;Rectangle captured,windowBounds;DateTime updated=DateTime.MinValue;bool capturing;
+        internal Bitmap Image {get{return image;}}
+        internal bool Due {get{return (DateTime.UtcNow-updated).TotalMilliseconds>=250;}}
+        internal void Refresh(Form window)
+        {
+            if(capturing||!window.Visible||Environment.OSVersion.Version.Build<19041||(!Due&&windowBounds==window.Bounds))return;
+            updated=DateTime.UtcNow;capturing=true;uint previous=0;bool excluded=false;
+            try
+            {
+                GetWindowDisplayAffinity(window.Handle,out previous);
+                excluded=SetWindowDisplayAffinity(window.Handle,0x11);if(!excluded)return;
+                Rectangle region=window.Bounds;region.Inflate(32,32);region=Rectangle.Intersect(region,SystemInformation.VirtualScreen);
+                using(var raw=new Bitmap(region.Width,region.Height,System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                {
+                    using(var graphics=Graphics.FromImage(raw))graphics.CopyFromScreen(region.Location,Point.Empty,region.Size);
+                    // Restore capture visibility before processing. Only this window's local
+                    // background is sampled; pixels stay in memory and are never saved.
+                    excluded=!SetWindowDisplayAffinity(window.Handle,previous);
+                    var blurred=new Bitmap(Math.Max(1,region.Width/3),Math.Max(1,region.Height/3),System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                    using(var graphics=Graphics.FromImage(blurred)){graphics.InterpolationMode=InterpolationMode.HighQualityBilinear;graphics.DrawImage(raw,new Rectangle(0,0,blurred.Width,blurred.Height));}
+                    Blur(blurred,3);
+                    var old=image;image=blurred;captured=region;windowBounds=window.Bounds;if(old!=null)old.Dispose();
+                }
+            }
+            catch(System.ComponentModel.Win32Exception){}catch(ExternalException){}
+            finally{if(excluded)SetWindowDisplayAffinity(window.Handle,previous);capturing=false;}
+        }
+        internal void Draw(Graphics graphics,Rectangle bounds)
+        {
+            float sx=image.Width/(float)captured.Width,sy=image.Height/(float)captured.Height;
+            var source=new RectangleF((bounds.Left-captured.Left)*sx,(bounds.Top-captured.Top)*sy,bounds.Width*sx,bounds.Height*sy);
+            graphics.InterpolationMode=InterpolationMode.HighQualityBilinear;graphics.DrawImage(image,new RectangleF(0,0,bounds.Width,bounds.Height),source,GraphicsUnit.Pixel);
+        }
+        static void Blur(Bitmap bitmap,int radius)
+        {
+            var rect=new Rectangle(0,0,bitmap.Width,bitmap.Height);var data=bitmap.LockBits(rect,System.Drawing.Imaging.ImageLockMode.ReadWrite,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            try
+            {
+                int width=bitmap.Width,height=bitmap.Height,stride=data.Stride;byte[] source=new byte[stride*height],target=new byte[source.Length];Marshal.Copy(data.Scan0,source,0,source.Length);
+                for(int pass=0;pass<3;pass++)
+                {
+                    for(int y=0;y<height;y++)for(int c=0;c<3;c++)
+                    {int sum=0;for(int x=-radius;x<=radius;x++)sum+=source[y*stride+Math.Max(0,Math.Min(width-1,x))*4+c];for(int x=0;x<width;x++){target[y*stride+x*4+c]=(byte)(sum/(radius*2+1));sum-=source[y*stride+Math.Max(0,x-radius)*4+c];sum+=source[y*stride+Math.Min(width-1,x+radius+1)*4+c];}}
+                    for(int x=0;x<width;x++)for(int c=0;c<3;c++)
+                    {int sum=0;for(int y=-radius;y<=radius;y++)sum+=target[Math.Max(0,Math.Min(height-1,y))*stride+x*4+c];for(int y=0;y<height;y++){source[y*stride+x*4+c]=(byte)(sum/(radius*2+1));sum-=target[Math.Max(0,y-radius)*stride+x*4+c];sum+=target[Math.Min(height-1,y+radius+1)*stride+x*4+c];}}
+                }
+                for(int y=0;y<height;y++)for(int x=0;x<width;x++)source[y*stride+x*4+3]=255;Marshal.Copy(source,0,data.Scan0,source.Length);
+            }finally{bitmap.UnlockBits(data);}
+        }
+        public void Dispose(){if(image!=null){image.Dispose();image=null;}}
     }
 }
