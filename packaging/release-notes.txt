@@ -1,0 +1,10 @@
+## Update compatibility fix
+
+- Decode GitHub release responses explicitly as UTF-8. Chinese release titles and notes no longer break JSON parsing on Windows with a different default code page.
+- Keep this release title and notes ASCII so unpatched 1.0.4.x clients can discover and install the fix through their existing Check and Update command.
+- Retain the 1.0.4.6 interface and widget features, package verification, SHA-256 checks, records, pairing, reminders, account paths and pause preferences.
+
+Existing users: use Check and Update. If a previous check is still displayed, close the update dialog and check again.
+Manual installation: download and run UsageObserver-Setup.exe. The complete ZIP is also available.
+
+Chinese documentation and the detailed usage guide remain in the repository README.

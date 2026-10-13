@@ -22,8 +22,17 @@ namespace CodexUsageTray
     }
     internal static class Updates
     {
-        public const string VersionText = "1.0.4.6";
+        public const string VersionText = "1.0.4.7";
         static object Get(Dictionary<string,object> d, string k) { object v; return d.TryGetValue(k,out v)?v:null; }
+        internal static WebClient CreateClient()
+        {
+            ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
+            // GitHub JSON is UTF-8. ANSI decoding can consume closing JSON quotes.
+            var client=new WebClient {Encoding=Encoding.UTF8};
+            client.Headers[HttpRequestHeader.UserAgent]="UsageObserver/"+VersionText;
+            client.Headers[HttpRequestHeader.Accept]="application/vnd.github+json";
+            return client;
+        }
         public static string Repository(string input)
         {
             string repo=input.Trim();
@@ -101,12 +110,9 @@ namespace CodexUsageTray
             try
             {
                 string repo=Updates.Repository(repository.Text);Updates.SaveRepository(data,repo);
-                ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
-                using(var client=new WebClient())
+                using(var client=Updates.CreateClient())
                 using(var deadline=new System.Threading.Timer(delegate {client.CancelAsync();},null,180000,System.Threading.Timeout.Infinite))
                 {
-                    client.Headers[HttpRequestHeader.UserAgent]="UsageObserver/"+Updates.VersionText;
-                    client.Headers[HttpRequestHeader.Accept]="application/vnd.github+json";
                     status.Text="正在检查 GitHub 正式版本…";
                     var package=Updates.ParseRelease(await client.DownloadStringTaskAsync("https://api.github.com/repos/"+repo+"/releases/latest"),repo);
                     if(package.Version<=new Version(Updates.VersionText)){status.Text="当前已是最新版本（"+Updates.VersionText+"）。";return;}
