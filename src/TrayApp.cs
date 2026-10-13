@@ -213,6 +213,7 @@ namespace CodexUsageTray
         internal readonly Form Preferences;
         public Dashboard(Action toggle, Action report, Action folder)
         {
+            SuspendLayout();
             Text="UsageObserver · 用量总览";ClientSize=new Size(620,Math.Min(736,Screen.PrimaryScreen.WorkingArea.Height-60));FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
             StartPosition=FormStartPosition.CenterScreen;BackColor=VisualTheme.Canvas;ForeColor=VisualTheme.Ink;Font=new Font("Microsoft YaHei UI",9F);AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;
             AutoScroll=true;AutoScrollMinSize=new Size(600,736);
@@ -221,8 +222,8 @@ namespace CodexUsageTray
             headline=new SurfaceBadge{Text="等待数据",Bounds=new Rectangle(484,30,112,28),Font=new Font("Microsoft YaHei UI",8.5F),ForeColor=VisualTheme.Accent};Controls.Add(headline);
             var hero=VisualTheme.Card(this,24,96,572,164,VisualTheme.Night);
             AddTo(hero,"CODEX",20,17,220,22,9,VisualTheme.Mint);
-            amount=VisualTheme.Number(hero,"—",15,42,244,70,43,Color.White);
-            usage=AddTo(hero,"等待额度快照",21,110,242,20,8.5F,Color.FromArgb(183,207,188));
+            amount=VisualTheme.Number(hero,"—",15,42,244,64,43,Color.White);
+            usage=AddTo(hero,"等待额度快照",21,114,242,18,8.5F,Color.FromArgb(183,207,188));
             quota=new QuotaBar{Bounds=new Rectangle(22,140,236,5),BackColor=VisualTheme.Night};hero.Controls.Add(quota);
             AddTo(hero,"周期重置",296,17,250,21,8.5F,Color.FromArgb(183,207,188));
             reset=AddTo(hero,"重置时间待获取",296,43,252,40,9,Color.White);
@@ -250,7 +251,8 @@ namespace CodexUsageTray
             dsHealth=AddTo(ds,"",308,82,246,38,8,VisualTheme.Muted);
             dsSince=AddLabel("",26,648,432,20,8,VisualTheme.Muted);
             DeepSeekReport=VisualTheme.Button(this,"余额记录  ↗",464,642,132,delegate{});
-            var preferences=new Form{Text="UsageObserver · 显示与提醒",ClientSize=new Size(592,524),Font=Font,BackColor=VisualTheme.Canvas,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,StartPosition=FormStartPosition.CenterParent,AutoScaleDimensions=new SizeF(96,96),AutoScaleMode=AutoScaleMode.Dpi};
+            var preferences=new Form();preferences.SuspendLayout();
+            preferences.Text="UsageObserver · 显示与提醒";preferences.ClientSize=new Size(592,524);preferences.Font=Font;preferences.BackColor=VisualTheme.Canvas;preferences.FormBorderStyle=FormBorderStyle.FixedDialog;preferences.MaximizeBox=false;preferences.MinimizeBox=false;preferences.StartPosition=FormStartPosition.CenterParent;preferences.AutoScaleDimensions=new SizeF(96,96);preferences.AutoScaleMode=AutoScaleMode.Dpi;
             Preferences=preferences;preferences.AutoScroll=true;preferences.AutoScrollMinSize=new Size(580,524);
             AddTo(preferences,"显示与提醒",24,19,360,37,19,VisualTheme.Ink,true);
             AddTo(preferences,"外观即时保存 · 提醒阈值单独保存",26,59,540,22,8.5F,VisualTheme.Muted);
@@ -271,6 +273,7 @@ namespace CodexUsageTray
             AddTo(alerts,"设为 0 关闭 · 低余额每 6 小时最多一次 · 日提醒每天一次",18,125,508,20,8,VisualTheme.Muted);
             Startup=new SurfaceToggle{Text="登录 Windows 后启动",Bounds=new Rectangle(26,477,280,27),ForeColor=VisualTheme.Ink};preferences.Controls.Add(Startup);
             SaveAlerts=VisualTheme.Button(preferences,"保存提醒阈值",402,472,166,delegate{},true);VisualTheme.Decorate(preferences);
+            preferences.ResumeLayout(false);preferences.PerformLayout();
             preferences.FormClosing+=delegate(object sender,FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;preferences.Hide();}};
             Toggle=VisualTheme.Button(this,"暂停记录",24,683,100,delegate{toggle();});
             AddButton("详细报告",135,683,100,delegate{report();});
@@ -280,6 +283,7 @@ namespace CodexUsageTray
             detailTips.SetToolTip(a,"Token 按本机记录统计；账户额度是共享快照。完整数据见详细报告。");
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}};
             Disposed+=delegate{preferences.Dispose();detailTips.Dispose();};
+            ResumeLayout(false);PerformLayout();
         }
         Label AddLabel(string text,int x,int y,int w,int h,float size,Color color){return AddTo(this,text,x,y,w,h,size,color);}
         static Label AddTo(Control parent,string text,int x,int y,int w,int h,float size,Color color,bool bold=false){return VisualTheme.Text(parent,text,x,y,w,h,size,color,bold);}
@@ -643,11 +647,11 @@ namespace CodexUsageTray
                     if (preview != null) using (var bmp = new Bitmap(floating.Width, floating.Height)) { floating.DrawToBitmap(bmp, new Rectangle(0, 0, floating.Width, floating.Height)); bmp.Save(Path.Combine(Path.GetDirectoryName(preview), "widget-preview.png"), System.Drawing.Imaging.ImageFormat.Png); }
                     Require(floating.TopMost && !floating.ShowInTaskbar && floating.LogicalSize == new Size(160,92), "compact widget window style");
                     Require(floating.Opacity == 1.0 && floating.FramePolicyResult == 0 && floating.BorderPolicyResult == 0, "text opacity and native frame suppression");
-                    if(Environment.OSVersion.Version.Build>=22621)Require(floating.FrostedReady&&floating.MaterialResult==0,"native backdrop blur request accepted");
+                    if(Environment.OSVersion.Version.Build>=22621)Require((floating.FrostedReady&&floating.MaterialResult==0)||(!floating.FrostedReady&&floating.LayeredRenderSucceeded),"native blur or working alpha fallback");
                     if(Environment.OSVersion.Version.Build>=15063)Require(floating.PerMonitorAware,"manifest requests per-monitor V2 DPI rendering");
                     Require(floating.LayeredRenderSucceeded, "per-pixel alpha rendering");
                     checks.Add("PASS: native per-pixel alpha rendering succeeds");
-                    checks.Add("PASS: opaque text surface and native rounded blur backdrop initialized; request acceptance checked separately from compositor proof");
+                    checks.Add("PASS: opaque text surface with native blur or alpha fallback; compositor pixels checked separately");
                     checks.Add("PASS: floating widget renders offscreen and uses topmost/tool window style");
                 }
                 if(preview!=null)

@@ -1,10 +1,10 @@
-## Update compatibility fix
+## Layout and transparency fixes
 
-- Decode GitHub release responses explicitly as UTF-8. Chinese release titles and notes no longer break JSON parsing on Windows with a different default code page.
-- Keep this release title and notes ASCII so unpatched 1.0.4.x clients can discover and install the fix through their existing Check and Update command.
-- Retain the 1.0.4.6 interface and widget features, package verification, SHA-256 checks, records, pairing, reminders, account paths and pause preferences.
+- Fix live redraw artifacts in the display switches and transparency slider. Repeated setting changes no longer replay text or slider graphics in other controls.
+- Defer dashboard and preferences DPI scaling until their controls have been created. Restore consistent spacing at 125% scaling and separate the large quota number from its usage caption.
+- When Windows transparency effects are disabled, use real per-pixel alpha transparency instead of displaying an opaque black blur window. Text stays opaque; system preferences remain unchanged.
+- Retain UTF-8 update decoding, ASCII release metadata for old-updater compatibility, records, pairing, account paths, pause and reminder settings.
 
-Existing users: use Check and Update. If a previous check is still displayed, close the update dialog and check again.
-Manual installation: download and run UsageObserver-Setup.exe. The complete ZIP is also available.
-
-Chinese documentation and the detailed usage guide remain in the repository README.
+Existing users: use Check and Update. Manual installation: download and run UsageObserver-Setup.exe.
+Validation covers native 125% redraw, actual background pixels at 78% transparency, focus preservation and isolated upgrade retention.
+Chinese usage documentation remains in the repository README.

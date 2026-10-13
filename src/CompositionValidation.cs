@@ -79,7 +79,7 @@ namespace CodexUsageTray
                 canvas.Bounds=new Rectangle(area.Left+24,area.Bottom-widget.Height-40,widget.Width+48,widget.Height+28);canvas.Show();
                 widget.Location=new Point(canvas.Left+24,canvas.Top+14);
                 widget.UpdateSnapshot(new Snapshot{Remaining=74,A=1290023,Running=true,Stale=false,AHealth="ok",BHealth="ok"},true,false);
-                widget.UpdateDeepSeek(new DeepSeekSnapshot{Balance=100m,A=123456,Stale=false});widget.Show();Settle();
+                widget.UpdateDeepSeek(new DeepSeekSnapshot{Balance=100m,A=123456,Stale=false});widget.SetTransparency(78);widget.Show();Settle();
                 Rectangle crop=widget.Bounds;int sampleX=(int)(160*widget.RenderScale),sampleY=(int)(178*widget.RenderScale);
                 Color first,second;double cornerError;
                 using(var bmp=Capture(crop)){bmp.Save(Path.Combine(output,"warm-background.png"));first=bmp.GetPixel(sampleX,sampleY);}
@@ -99,7 +99,8 @@ namespace CodexUsageTray
                 bool preserved=GetForegroundWindow()==foreground;
                 var evidence=new{background_response=Distance(first,second),transparency_response=Distance(opaque,transparent),corner_error=cornerError,blur_variation=blurVariation,unblurred_variation=plainVariation,foreground_preserved=preserved,material_request_succeeded=widget.FrostedReady};
                 File.WriteAllText(Path.Combine(output,"composition-validation.json"),new JavaScriptSerializer().Serialize(evidence));
-                return evidence.background_response>15&&evidence.transparency_response>15&&cornerError<3&&plainVariation>3&&blurVariation<plainVariation*.35&&preserved?0:1;
+                bool materialValid=widget.FrostedReady?blurVariation<plainVariation*.35:blurVariation>plainVariation*.45&&blurVariation<plainVariation*.75;
+                return evidence.background_response>15&&evidence.transparency_response>15&&cornerError<3&&plainVariation>3&&materialValid&&preserved?0:1;
             }
         }
     }

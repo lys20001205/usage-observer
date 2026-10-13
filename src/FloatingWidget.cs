@@ -106,10 +106,12 @@ namespace CodexUsageTray
         protected override void OnVisibleChanged(EventArgs e){base.OnVisibleChanged(e);SyncGlass();}
         void SyncGlass()
         {
-            if(glass==null||glass.IsDisposed||!glass.Ready||syncingGlass)return;
+            if(glass==null||glass.IsDisposed||syncingGlass)return;
+            if(!glass.Ready){if(glass.Visible)glass.Hide();if(Owner==glass)Owner=null;return;}
             syncingGlass=true;try
             {
                 glass.Match(Bounds);
+                if(Owner!=glass)Owner=glass;
                 if(Visible){if(!glass.Visible)glass.Show();WindowRecovery.SetWindowPos(glass.Handle,Handle,Left,Top,Width,Height,0x10|0x40);}
                 else if(glass.Visible)glass.Hide();
             }finally{syncingGlass=false;}
@@ -122,7 +124,7 @@ namespace CodexUsageTray
                 var suggested=(NativeRect)Marshal.PtrToStructure(m.LParam,typeof(NativeRect));Bounds=Rectangle.FromLTRB(suggested.Left,suggested.Top,suggested.Right,suggested.Bottom);pending=true;
                 m.Result=IntPtr.Zero;return;
             }
-            base.WndProc(ref m);if(m.Msg==0x031A||m.Msg==0x031E){RemoveSystemFrame();glass.Attach(Handle);pending=true;}
+            base.WndProc(ref m);if(m.Msg==0x001A||m.Msg==0x031A||m.Msg==0x031E){RemoveSystemFrame();glass.Attach(Handle);SyncGlass();pending=true;}
         }
         internal static Point Clamp(Point p,Size size,Rectangle area){return new Point(Math.Max(area.Left,Math.Min(p.X,Math.Max(area.Left,area.Right-size.Width))),Math.Max(area.Top,Math.Min(p.Y,Math.Max(area.Top,area.Bottom-size.Height))));}
         internal void ApplyLogicalSize(Size size)

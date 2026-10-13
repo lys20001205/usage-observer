@@ -109,14 +109,22 @@ namespace CodexUsageTray
     }
     internal sealed class SurfaceToggle : CheckBox
     {
-        public SurfaceToggle(){AutoSize=false;Cursor=Cursors.Hand;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.SupportsTransparentBackColor,true);BackColor=Color.Transparent;}
+        public SurfaceToggle(){AutoSize=false;Cursor=Cursors.Hand;UseVisualStyleBackColor=false;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.Opaque,true);SetStyle(ControlStyles.OptimizedDoubleBuffer,false);BackColor=VisualTheme.Canvas;}
+        protected override void OnParentChanged(EventArgs e){base.OnParentChanged(e);BackColor=Parent is SurfaceCard?((SurfaceCard)Parent).Fill:Parent==null?VisualTheme.Canvas:Parent.BackColor;}
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            // A transparent native CheckBox can replay sibling content during live redraw.
+            // Paint this control's local surface instead of asking Windows to copy its parent.
+            Color fill=Parent is SurfaceCard?((SurfaceCard)Parent).Fill:BackColor;
+            using(var brush=new SolidBrush(fill))e.Graphics.FillRectangle(brush,ClientRectangle);
+        }
         protected override void OnCheckedChanged(EventArgs e){base.OnCheckedChanged(e);Invalidate();}
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;float scale=e.Graphics.DpiX/96F;int w=(int)(34*scale),h=(int)(20*scale),margin=(int)(3*scale);var track=new Rectangle(Width-w-1,(Height-h)/2,w,h);
+            OnPaintBackground(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;float scale=e.Graphics.DpiX/96F;int w=(int)(34*scale),h=(int)(20*scale),margin=(int)(3*scale);var track=new Rectangle(Width-w-1,(Height-h)/2,w,h);
             using(var path=VisualTheme.Round(track,h/2))using(var brush=new SolidBrush(!Enabled?VisualTheme.Border:Checked?VisualTheme.Accent:Color.FromArgb(198,209,197)))e.Graphics.FillPath(brush,path);
             int diameter=h-margin*2;using(var brush=new SolidBrush(Color.White))e.Graphics.FillEllipse(brush,Checked?track.Right-margin-diameter:track.Left+margin,track.Top+margin,diameter,diameter);
-            TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(0,0,Width-w-(int)(12*scale),Height),Enabled?ForeColor:VisualTheme.Muted,TextFormatFlags.Left|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPrefix);
+            TextRenderer.DrawText(e.Graphics,Text,Font,new Rectangle(0,0,Width-w-(int)(12*scale),Height),Enabled?ForeColor:VisualTheme.Muted,TextFormatFlags.Left|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPrefix|TextFormatFlags.PreserveGraphicsClipping|TextFormatFlags.PreserveGraphicsTranslateTransform);
             if(Focused&&ShowFocusCues)ControlPaint.DrawFocusRectangle(e.Graphics,new Rectangle(1,1,Width-3,Height-3));
         }
     }
@@ -125,7 +133,7 @@ namespace CodexUsageTray
         int value=60;bool dragging;public int Minimum=0,Maximum=90,SmallChange=1,LargeChange=10;
         public event EventHandler ValueChanged;
         public int Value {get{return value;}set{int clamped=Math.Max(Minimum,Math.Min(Maximum,value));if(this.value==clamped)return;this.value=clamped;Invalidate();AccessibilityNotifyClients(AccessibleEvents.ValueChange,-1);if(ValueChanged!=null)ValueChanged(this,EventArgs.Empty);}}
-        public SurfaceSlider(){TabStop=true;AccessibleRole=AccessibleRole.Slider;AccessibleName="浮窗透明度";Cursor=Cursors.Hand;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.Selectable,true);}
+        public SurfaceSlider(){TabStop=true;AccessibleRole=AccessibleRole.Slider;AccessibleName="浮窗透明度";Cursor=Cursors.Hand;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.Selectable|ControlStyles.Opaque,true);SetStyle(ControlStyles.OptimizedDoubleBuffer,false);}
         protected override bool IsInputKey(Keys keyData){return keyData==Keys.Left||keyData==Keys.Right||keyData==Keys.Up||keyData==Keys.Down||keyData==Keys.Home||keyData==Keys.End||keyData==Keys.PageUp||keyData==Keys.PageDown||base.IsInputKey(keyData);}
         protected override void OnKeyDown(KeyEventArgs e){base.OnKeyDown(e);if(e.KeyCode==Keys.Left||e.KeyCode==Keys.Down)Value-=SmallChange;else if(e.KeyCode==Keys.Right||e.KeyCode==Keys.Up)Value+=SmallChange;else if(e.KeyCode==Keys.PageDown)Value-=LargeChange;else if(e.KeyCode==Keys.PageUp)Value+=LargeChange;else if(e.KeyCode==Keys.Home)Value=Minimum;else if(e.KeyCode==Keys.End)Value=Maximum;else return;e.Handled=true;}
         void SetFromX(int x){int inset=(int)(10*VisualTheme.Scale(this));Value=Minimum+(int)Math.Round((Maximum-Minimum)*(x-inset)/(double)Math.Max(1,Width-inset*2));}

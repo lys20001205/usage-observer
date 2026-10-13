@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace CodexUsageTray
 {
@@ -33,6 +34,12 @@ namespace CodexUsageTray
         protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);Apply();}
         void Apply()
         {
+            Ready=false;
+            // Windows can accept the accent API while rendering an opaque black surface
+            // when its transparency effect is disabled. Keep the alpha overlay usable.
+            using(var settings=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"))
+                if(SystemInformation.HighContrast||(settings!=null&&Convert.ToInt32(settings.GetValue("EnableTransparency",1))==0))
+                {MaterialResult=1;return;}
             try
             {
                 int none=1,noBorder=unchecked((int)0xFFFFFFFE),enabledFrame=2,rounded=2;
@@ -43,7 +50,7 @@ namespace CodexUsageTray
                 finally{Marshal.FreeHGlobal(pointer);}
             }catch(DllNotFoundException){Ready=false;}catch(EntryPointNotFoundException){Ready=false;}
         }
-        internal void Attach(IntPtr foreground){IntPtr hwnd=Handle;}
+        internal void Attach(IntPtr foreground){IntPtr hwnd=Handle;Apply();}
         internal void Match(Rectangle bounds){if(Bounds!=bounds)Bounds=bounds;}
         protected override void OnPaintBackground(PaintEventArgs e)
         {
