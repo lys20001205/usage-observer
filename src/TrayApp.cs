@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Management;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -276,7 +277,7 @@ namespace CodexUsageTray
             preferences.ResumeLayout(false);preferences.PerformLayout();
             preferences.FormClosing+=delegate(object sender,FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;preferences.Hide();}};
             Toggle=VisualTheme.Button(this,"暂停记录",24,683,100,delegate{toggle();});
-            AddButton("详细报告",135,683,100,delegate{report();});
+            AddButton("详情与趋势",135,683,100,delegate{report();});
             AddButton("显示与提醒",246,683,124,delegate{preferences.Show(this);});
             UpdateProgram=AddButton("检查更新",381,683,104,delegate{});((SurfaceButton)UpdateProgram).Quiet=true;
             var collapse=AddButton("收起",496,683,100,delegate{Hide();});((SurfaceButton)collapse).Quiet=true;
@@ -340,6 +341,7 @@ namespace CodexUsageTray
         readonly ResetMonitor resets;
         ResetForm resetWindow;
         ThemeForm themeWindow;
+        DetailsForm detailsWindow;
         readonly WidgetSettings settings;
         readonly StartupSetting startup;
         readonly ToolStripMenuItem startupItem, widgetItem;
@@ -361,7 +363,7 @@ namespace CodexUsageTray
             root = directory;
             File.Delete(Path.Combine(root, "ui-exit.request"));
             settings = WidgetSettings.Load(root); startup = new StartupSetting(Application.ExecutablePath);
-            window = new Dashboard(Toggle, delegate { OpenFile("report.md"); }, delegate { OpenFile(""); });
+            window = new Dashboard(Toggle, ShowDetailsWindow, delegate { OpenFile(""); });
             widget = new FloatingWidget(ShowWindow, delegate(Point point) { settings.X = point.X; settings.Y = point.Y; SaveSettings(); }, delegate(Size size) {settings.WidgetWidth=size.Width;settings.WidgetHeight=size.Height;SaveSettings();}); widget.Place(settings);
             resets=new ResetMonitor(root);
             var menu = new ContextMenuStrip { BackColor=VisualTheme.Surface, ForeColor=VisualTheme.Readable(VisualTheme.Ink,VisualTheme.Surface),Renderer=new ThemeMenuRenderer(),Font=new Font("Microsoft YaHei UI",9F), ShowImageMargin=false };
@@ -380,7 +382,7 @@ namespace CodexUsageTray
             menu.Items.Add("检查程序更新", null, delegate { new UpdateForm(root).Show(); });
             window.UpdateProgram.Click += delegate { new UpdateForm(root).Show(); };
             toggle = new ToolStripMenuItem("暂停记录", null, delegate { Toggle(); }); menu.Items.Add(toggle);
-            menu.Items.Add("打开详细报告", null, delegate { OpenFile("report.md"); });
+            menu.Items.Add("详情与额度趋势",null,delegate{ShowDetailsWindow();});
             menu.Items.Add("打开 DeepSeek 记录", null, delegate { OpenFile("deepseek-report.md"); });
             menu.Items.Add("打开数据文件夹", null, delegate { OpenFile(""); });
             menu.Items.Add(new ToolStripSeparator());
@@ -421,6 +423,7 @@ namespace CodexUsageTray
         void ShowWindow() { window.Show(); window.WindowState = FormWindowState.Normal; window.Activate(); }
         void ShowResetWindow() {if(resetWindow==null||resetWindow.IsDisposed)resetWindow=new ResetForm(resets);resetWindow.Show();}
         void ShowThemeWindow(){if(themeWindow==null||themeWindow.IsDisposed)themeWindow=new ThemeForm(root);themeWindow.Show(window.Visible?window:null);}
+        void ShowDetailsWindow(){if(detailsWindow==null||detailsWindow.IsDisposed)detailsWindow=new DetailsForm(root,BackendSource.Root);detailsWindow.Show(window.Visible?window:null);}
         void SaveSettings() { try { settings.Save(root); } catch (Exception e) { File.AppendAllText(Path.Combine(root, "tray-errors.log"), "Settings: " + e.Message + Environment.NewLine); } }
         void SyncSettings()
         {
@@ -518,6 +521,7 @@ namespace CodexUsageTray
             timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); widget.Dispose(); window.Dispose(); appIcon.Dispose();
             resets.Dispose();if(resetWindow!=null&&!resetWindow.IsDisposed)resetWindow.Dispose();
             if(themeWindow!=null&&!themeWindow.IsDisposed)themeWindow.Dispose();
+            if(detailsWindow!=null&&!detailsWindow.IsDisposed)detailsWindow.Dispose();
             try { File.Delete(Path.Combine(root, "tray-status.json")); } catch { }
             base.ExitThreadCore();
         }
@@ -547,6 +551,11 @@ namespace CodexUsageTray
             VisualTheme.ApplyTheme(ThemeSettings.Load(root));
             if (args.Length > 0 && args[0] == "--self-test") return SelfTest(root, args.Length > 1 ? args[1] : null);
             if(args.Length>1&&args[0]=="--composition-test")return CompositionValidation.Run(args[1]);
+            if(args.Length>2&&args[0]=="--history-check")
+            {
+                try{var history=QuotaHistory.Read(args[1]);var analysis=TrendAnalysis.Analyze(history,false,TimeSpan.FromHours(24),5,DateTimeOffset.UtcNow);File.WriteAllText(args[2],new JavaScriptSerializer().Serialize(new{read_only=true,points=history.Points.Count,total=history.Total,error=history.Error,truncated=history.Truncated,remaining=analysis.Remaining,observed_drop=analysis.Drop,invalid=analysis.Invalid,resets=analysis.Resets,gaps=analysis.Gaps,account_unknown=analysis.AccountUnknown,summary=analysis.Summary,events=analysis.Events.Select(e=>new{time=e.Time.ToString("o"),kind=e.Kind,title=e.Title,drop=e.Drop,detail=e.Detail}).ToArray()}),Encoding.UTF8);return string.IsNullOrEmpty(history.Error)?0:1;}
+                catch(Exception error){File.WriteAllText(args[2],new JavaScriptSerializer().Serialize(new{error=error.Message}));return 1;}
+            }
             if (args.Length > 0 && args[0] == "--quit-ui")
             {
                 File.WriteAllText(Path.Combine(root, "ui-exit.request"), "UI restart requested"); return 0;

@@ -1,12 +1,13 @@
-## Theme presets and custom colors
+## Quota trends and anomaly review
 
-- Open Theme and Colors from the widget context menu or Display and Alerts.
-- Choose Forest, Ocean, Violet or Graphite; customize six colors using a color picker or #RRGGBB input.
-- Preview the dashboard and widget together, save for restart persistence, cancel to restore the previous palette, or preview and save the default theme.
-- Match main interface text to its background without changing fonts or DPI layout.
-- Keep the independent frosted background and adjustable transparency without changing Windows settings.
-- Retain records, pairing, account paths, manual pause, widget size and transparency preferences.
+- Open Details and Trends from the dashboard or widget context menu.
+- Plot sampled remaining quota for primary and secondary windows across 6 hours, 24 hours, 7 days or available loaded history.
+- Show observed percentage-point declines, recent speed and evidence for rapid changes or quota changes without observed token growth.
+- Separate resets, restoration, window changes, account changes and missing samples. Never infer device ownership or billing abuse from quota percentages.
+- Configure the rapid-change threshold, inspect event evidence and retain the original text report.
+- Read existing SQLite history without changing the recorder, database schema, Windows settings or model sessions. Bound history to the latest 30,000 samples.
+- Retain records, pairing, account paths, pause state, themes, widget size and transparency.
 - Keep UTF-8 update decoding and ASCII release metadata for old-client compatibility.
 
-Validation includes repeated theme changes without geometry drift, native editor text visibility, custom color persistence, cancellation, default restoration, malformed-file recovery, independent blur and isolated upgrade retention.
+Validation covers calm usage, isolated jumps, reset boundaries, account switches, gaps, failed/invalid/future/duplicate samples, acceleration, correlation coverage, read-only database access, native detail rendering and upgrade retention.
 Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.
