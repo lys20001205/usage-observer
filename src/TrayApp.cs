@@ -351,6 +351,8 @@ namespace CodexUsageTray
         readonly ToolStripMenuItem toggle;
         Snapshot snapshot = new Snapshot();
         DeepSeekSnapshot deepseekSnapshot = new DeepSeekSnapshot();
+        readonly ServiceHealth serviceHealth;
+        ServiceHealthForm serviceHealthWindow;
         string thresholdCurrency = "";
         bool alive, stopping, starting;
         DateTime startAttempt;
@@ -363,6 +365,7 @@ namespace CodexUsageTray
             root = directory;
             File.Delete(Path.Combine(root, "ui-exit.request"));
             settings = WidgetSettings.Load(root); startup = new StartupSetting(Application.ExecutablePath);
+            serviceHealth=new ServiceHealth(root,BackendSource.Root);
             window = new Dashboard(Toggle, ShowDetailsWindow, delegate { OpenFile(""); });
             widget = new FloatingWidget(ShowWindow, delegate(Point point) { settings.X = point.X; settings.Y = point.Y; SaveSettings(); }, delegate(Size size) {settings.WidgetWidth=size.Width;settings.WidgetHeight=size.Height;SaveSettings();}); widget.Place(settings);
             resets=new ResetMonitor(root);
@@ -380,6 +383,8 @@ namespace CodexUsageTray
             window.ResetAnnouncements.Click+=delegate {ShowResetWindow();};
             menu.Items.Add("局域网设备与账号设置", null, delegate { new NetworkForm(root).Show(); });
             menu.Items.Add("检查程序更新", null, delegate { new UpdateForm(root).Show(); });
+            menu.Items.Add("OpenAI 状态与输出速度",null,delegate{if(serviceHealthWindow==null||serviceHealthWindow.IsDisposed)serviceHealthWindow=new ServiceHealthForm(serviceHealth);serviceHealthWindow.Show(window.Visible?window:null);});
+            var statusAlerts=new ToolStripMenuItem("OpenAI 状态变化提醒"){CheckOnClick=true,Checked=serviceHealth.Alerts};statusAlerts.CheckedChanged+=delegate{serviceHealth.Alerts=statusAlerts.Checked;serviceHealth.Save();};menu.Items.Add(statusAlerts);
             window.UpdateProgram.Click += delegate { new UpdateForm(root).Show(); };
             toggle = new ToolStripMenuItem("暂停记录", null, delegate { Toggle(); }); menu.Items.Add(toggle);
             menu.Items.Add("详情与额度趋势",null,delegate{ShowDetailsWindow();});
@@ -410,6 +415,7 @@ namespace CodexUsageTray
             appIcon = MakeIcon(); window.Icon = appIcon;
             tray = new NotifyIcon { Icon = appIcon, ContextMenuStrip = menu, Text = "Codex 用量记录 · 正在读取", Visible = true };
             resets.Notification+=delegate(string message){tray.ShowBalloonTip(10000,"Codex 全局重置提醒",message,ToolTipIcon.Info);};
+            serviceHealth.Notification+=delegate(string message){tray.ShowBalloonTip(10000,"OpenAI 服务状态",message,ToolTipIcon.Info);};
             widget.ContextMenuStrip = menu; widget.Icon = appIcon;
             SyncSettings();
             if (settings.Visible) widget.Show();
@@ -463,6 +469,7 @@ namespace CodexUsageTray
         void Refresh()
         {
             resets.Tick();
+            serviceHealth.Tick();
             settings.RecorderPaused=WidgetSettings.Load(BackendSource.Legacy?BackendSource.Root:root).RecorderPaused;
             if (File.Exists(Path.Combine(root, "ui-exit.request"))) { File.Delete(Path.Combine(root, "ui-exit.request")); ExitThread(); return; }
             try { snapshot = Snapshot.Parse(File.ReadAllText(Path.Combine(BackendSource.Root, "status.json"), Encoding.UTF8), DateTimeOffset.UtcNow); }
@@ -494,8 +501,8 @@ namespace CodexUsageTray
             string notification = alive && !stopping ? DeepSeekAlerts.Evaluate(deepseekSnapshot, settings, DateTimeOffset.UtcNow) : null;
             if (notification != null && alive && !stopping) { SaveSettings(); tray.ShowBalloonTip(8000, "DeepSeek 用量提醒", notification, ToolTipIcon.Warning); File.AppendAllText(Path.Combine(root, "notifications.log"), DateTimeOffset.Now.ToString("o") + " " + notification + Environment.NewLine, Encoding.UTF8); }
             SyncSettings();
-            window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
-            string state = new JavaScriptSerializer().Serialize(new { pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
+            window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.UpdateServiceHealth(serviceHealth.Status,serviceHealth.Speed);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
+            string state = new JavaScriptSerializer().Serialize(new { version=Updates.VersionText, openai_status=serviceHealth.Status.State, openai_status_stale=serviceHealth.Status.Stale, openai_checked_at=serviceHealth.Status.Checked.ToString("o"), output_effective_tps=serviceHealth.Speed.Effective, output_tps_stale=serviceHealth.Speed.Stale, output_tps_samples=serviceHealth.Speed.Samples, output_tps_window_seconds=1800, output_tps_method="effective output including reasoning and waiting; excluding explicit tool execution", widget_status_line=widget.StatusLine, widget_speed_line=widget.SpeedLine, pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
             if (state != publishedStatus)
             {
                 try { File.WriteAllText(Path.Combine(root, "tray-status.json"), state, Encoding.UTF8); publishedStatus = state; } catch { }
@@ -519,6 +526,7 @@ namespace CodexUsageTray
             BackgroundLifetime.Log("ui_clean_exit recorder_paused="+settings.RecorderPaused);
             settings.X = widget.Left; settings.Y = widget.Top;settings.WidgetWidth=widget.LogicalSize.Width;settings.WidgetHeight=widget.LogicalSize.Height;SaveSettings();
             timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); widget.Dispose(); window.Dispose(); appIcon.Dispose();
+            serviceHealth.Dispose();if(serviceHealthWindow!=null&&!serviceHealthWindow.IsDisposed)serviceHealthWindow.Dispose();
             resets.Dispose();if(resetWindow!=null&&!resetWindow.IsDisposed)resetWindow.Dispose();
             if(themeWindow!=null&&!themeWindow.IsDisposed)themeWindow.Dispose();
             if(detailsWindow!=null&&!detailsWindow.IsDisposed)detailsWindow.Dispose();
@@ -588,6 +596,7 @@ namespace CodexUsageTray
             try
             {
                 Updates.SelfTest(); checks.Add("PASS: GitHub repository/release parsing, stable version, HTTPS origin, digest/size verification and corrupt-download rejection");
+                ServiceHealth.SelfTest();checks.Add("PASS: official service scope, degradation/recovery/deduplication, unknown/stale failures and effective TPS formatting");
                 string json = "{\"running\":true,\"pid\":123,\"remaining_percent\":74,\"used_percent\":26,\"recorded_tokens\":{\"A\":1290023,\"B\":987654},\"last_sample_at\":\"2026-10-09T07:55:31Z\",\"recording_started_at\":\"2026-10-09T07:47:41Z\",\"interval_seconds\":60,\"health\":{\"A\":{\"status\":\"ok\"},\"B\":{\"status\":\"ok\"},\"classification\":\"基线或额度未上升\"}}";
                 json = json.Insert(1, "\"primary_resets_at\":1792137600,\"primary_window_minutes\":10080,\"secondary_resets_at\":1791658800,\"secondary_window_minutes\":300,");
                 var now = DateTimeOffset.Parse("2026-10-09T07:56:00Z"); var s = Snapshot.Parse(json, now);
@@ -659,6 +668,7 @@ namespace CodexUsageTray
                 using (var floating = new FloatingWidget(delegate { }, delegate(Point point) { }))
                 {
                     floating.UpdateDeepSeek(ds); floating.UpdateSnapshot(s, s.Running, false); CreateHandles(floating);
+                    floating.UpdateServiceHealth(new OfficialStatus{State="degraded_performance",Checked=DateTimeOffset.UtcNow,Description="Codex / ChatGPT Work performance degradation"},new SpeedStatus{Effective=5.1,Samples=14,Recorded=14,Matched=14,Checked=DateTimeOffset.UtcNow});
                     if (preview != null) using (var bmp = new Bitmap(floating.Width, floating.Height)) { floating.DrawToBitmap(bmp, new Rectangle(0, 0, floating.Width, floating.Height)); bmp.Save(Path.Combine(Path.GetDirectoryName(preview), "widget-preview.png"), System.Drawing.Imaging.ImageFormat.Png); }
                     Require(floating.TopMost && !floating.ShowInTaskbar && floating.LogicalSize == new Size(160,92), "compact widget window style");
                     Require(floating.Opacity == 1.0 && floating.FramePolicyResult == 0 && floating.BorderPolicyResult == 0, "text opacity and native frame suppression");
@@ -749,6 +759,7 @@ namespace CodexUsageTray
                         var example=new Snapshot{Remaining=100,PrimaryReset=DateTimeOffset.Now.AddDays(365).ToOffset(TimeSpan.FromHours(8)),A=long.MaxValue,Stale=false,QuotaStale=state=="stale"};
                         if(state=="unknown")example.Remaining=null;
                         floating.ApplyLogicalSize(size);floating.UpdateSnapshot(example,state!="paused",false);
+                        floating.UpdateServiceHealth(new OfficialStatus{State=state=="unknown"?"unknown":state=="fresh"?"operational":"degraded_performance",Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""},new SpeedStatus{Effective=state=="unknown"?(double?)null:state=="fresh"?5.1:123456.7,Samples=14,Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""});
                         floating.UpdateDeepSeek(new DeepSeekSnapshot{Balance=123456.78m,A=long.MaxValue,Stale=state=="stale"});
                         monitor.Cache.Stale=state=="old-deadline";monitor.Cache.Scheduled=null;
                         if(state=="official"||state=="deadline"||state=="estimate"||state=="old-deadline")
@@ -760,10 +771,18 @@ namespace CodexUsageTray
                         if(state.Contains("deadline"))Require(floating.TimingSummary.Contains("最晚"),"deadline keeps by semantics");
                         if(state=="estimate")Require(floating.TimingSummary.StartsWith("预计 "),"community estimate is distinct");
                         if(state=="old-deadline")Require(floating.TimingSummary.StartsWith("旧预"),"stale forecast remains marked");
-                        Require(floating.RenderedLines.Count<=9,"compact information without repeated timestamps");
+                        Require(floating.RenderedLines.Contains(floating.StatusLine)&&floating.RenderedLines.Contains(floating.SpeedLine),"service status and TPS visible in every widget size");
+                        Require(floating.RenderedLines.Count<=(size.Height>=212&&size.Width>=250?11:size.Height>=240?9:7),"compact information without repeated timestamps "+size+" count="+floating.RenderedLines.Count);
                     }
                 }
                 checks.Add("PASS: complete text fits seven sizes and eight states without ellipses; large balances, long dates, forecast/deadline/estimate and stale meanings retained");
+                using(var health=new ServiceHealth(root,root))
+                {
+                    health.Status=new OfficialStatus{State="degraded_performance",Checked=DateTimeOffset.UtcNow,Description="Degraded performance in Codex and ChatGPT Work",Incident="Degraded performance in Codex and ChatGPT Work"};
+                    health.Speed=new SpeedStatus{Effective=5.1,Samples=14,Recorded=14,Matched=14,Checked=DateTimeOffset.UtcNow,LastResponse=DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(8)).ToString("o"),Models="gpt-6.1-sol · 5.1 t/s"};
+                    using(var form=new ServiceHealthForm(health)){CreateHandles(form);form.PerformLayout();if(preview!=null)PreviewHost.Render(form,Path.Combine(Path.GetDirectoryName(preview),"openai-status-preview.png"));}
+                }
+                checks.Add("PASS: scoped service health and speed details render without focus or network requests");
                 using (var network = new NetworkForm(root))
                 {
                     CreateHandles(network); network.PerformLayout();

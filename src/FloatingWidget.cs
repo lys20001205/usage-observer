@@ -12,6 +12,9 @@ namespace CodexUsageTray
         internal const int MinimumWidth=144,MinimumHeight=88,MaximumWidth=560,MaximumHeight=360;
         internal const int EdgeLeft=1,EdgeRight=2,EdgeTop=4,EdgeBottom=8;
         Snapshot snapshot=new Snapshot();DeepSeekSnapshot deepseek=new DeepSeekSnapshot();
+        OfficialStatus officialStatus=new OfficialStatus();SpeedStatus speedStatus=new SpeedStatus();
+        internal string StatusLine {get{return officialStatus.Compact;}}
+        internal string SpeedLine {get{return speedStatus.Compact;}}
         ResetNotice announcement;bool announcementStale,alive,stopping,dragging,resizing,moved,pending,syncingGlass;
         string resetNotice="";int resizeEdges,transparency=60;Point mouseOrigin;Rectangle originalBounds;DateTime lastRaise;
         internal bool TextFits;internal float SmallestTextSize;
@@ -145,8 +148,9 @@ namespace CodexUsageTray
         public void UpdateSnapshot(Snapshot s,bool running,bool paused)
         {
             snapshot=s;alive=running;stopping=paused;
-            tooltip.SetToolTip(this,s.Tooltip(running,paused)+"\n"+s.ResetTooltip+"\n"+resetNotice+"\n"+deepseek.ShortText+"\n今日本机 DSH token："+Snapshot.Compact(deepseek.A)+"\n点击查看详情 · 拖中间移动 · 拖边缘/右下角缩放");pending=true;
+            tooltip.SetToolTip(this,s.Tooltip(running,paused)+"\n"+officialStatus.Compact+" · "+officialStatus.Description+"\n"+speedStatus.Detail+"\n"+s.ResetTooltip+"\n"+resetNotice+"\n"+deepseek.ShortText+"\n今日本机 DSH token："+Snapshot.Compact(deepseek.A)+"\n右键查看 OpenAI 状态与速度 · 拖中间移动 · 拖边缘/右下角缩放");pending=true;
         }
+        public void UpdateServiceHealth(OfficialStatus status,SpeedStatus speed){officialStatus=status;speedStatus=speed;pending=true;}
         public void UpdateDeepSeek(DeepSeekSnapshot value){deepseek=value;pending=true;}
         public void UpdateResetNotice(ResetMonitor monitor){resetNotice=monitor.Tooltip;announcement=monitor.Active;announcementStale=monitor.Cache.Stale;pending=true;}
         public void EnsurePresentation(bool desired){string reason=WindowRecovery.Ensure(this,desired,dragging||resizing,ref lastRaise);if(reason.Length>0&&reason!="cloaked")BackgroundLifetime.Log("widget_recovered reason="+reason);SyncGlass();}
@@ -206,23 +210,23 @@ namespace CodexUsageTray
             string status=stopping||!alive?"·停":snapshot.QuotaStale||snapshot.Stale||snapshot.ReadFailed?"·旧":!snapshot.Remaining.HasValue?"·待":"";
             TextLine(g,"CODEX"+status,11,muted,p,7,wide?split-p-16:w-p*2,17,false,false);
             using(var state=new SolidBrush(fresh?VisualTheme.Mint:VisualTheme.Warning))g.FillEllipse(state,(wide?split-10:w-16)*scale,13*scale,4*scale,4*scale);
-            float numberHeight=tall?Math.Min(75,h*.3F):Math.Min(42,h-59),numberSize=tall?Math.Min(60,42+(h-176)*.15F):Math.Min(34,h*.33F);
-            TextLine(g,value,numberSize,VisualTheme.WidgetText,p-1,25,wide?split-p-16:split-p+3,numberHeight,false,true);
-            float barY=tall?35+numberHeight:h-31;
+            float numberHeight=tall?Math.Min(75,h*.3F):Math.Min(42,h-66),numberSize=tall?Math.Min(60,42+(h-176)*.15F):Math.Min(34,h*.30F);
+            TextLine(g,value,numberSize,VisualTheme.WidgetText,p-1,tall?25:20,wide?split-p-16:split-p+3,numberHeight,false,true);
+            float barY=tall?35+numberHeight:h-24;
             if(wide)
             {
                 TextLine(g,deepseek.Stale?"DSH·旧":"DSH",11,muted,split+12,7,w-split-p-12,17,false,false);
-                TextLine(g,BalanceText,tall?Math.Min(34,27+(h-176)*.05F):23,deepseek.Stale?muted:VisualTheme.Mint,split+10,tall?29:30,w-split-p-10,numberHeight,false,true);
+                TextLine(g,BalanceText,tall?Math.Min(34,27+(h-176)*.05F):23,deepseek.Stale?muted:VisualTheme.Mint,split+10,tall?29:22,w-split-p-10,numberHeight,false,true);
             }
             else if(tall)
             {
-                TextLine(g,deepseek.Stale?"DSH·旧":"DSH",11,muted,p,barY+14,w-p*2,17,false,false);
-                TextLine(g,BalanceText,20,deepseek.Stale?muted:VisualTheme.Mint,p,barY+32,w-p*2,27,false,true);
+                if(h<212)TextLine(g,(deepseek.Stale?"DSH·旧  ":"DSH  ")+BalanceText,15,deepseek.Stale?muted:VisualTheme.Mint,p,barY+18,w-p*2,22,false,true);
+                else {TextLine(g,deepseek.Stale?"DSH·旧":"DSH",11,muted,p,barY+14,w-p*2,17,false,false);TextLine(g,BalanceText,20,deepseek.Stale?muted:VisualTheme.Mint,p,barY+32,w-p*2,27,false,true);}
             }
             else
             {
                 TextLine(g,deepseek.Stale?"DSH·旧":"DSH",10.5F,muted,split,7,w-split-p-9,17,true,false);
-                TextLine(g,BalanceText,14,deepseek.Stale?muted:VisualTheme.Mint,split,30,w-split-p,numberHeight-5,true,true);
+                TextLine(g,BalanceText,14,deepseek.Stale?muted:VisualTheme.Mint,split,23,w-split-p,numberHeight,true,true);
             }
             float contentW=w-p*2,trackHeight=3*scale;
             using(var path=VisualTheme.Round(new Rectangle((int)(p*scale),(int)(barY*scale),(int)(contentW*scale),(int)trackHeight),(int)Math.Ceiling(trackHeight/2)))
@@ -231,21 +235,27 @@ namespace CodexUsageTray
             int progressWidth=(int)(contentW*remaining/100*scale);
             if(progressWidth>0)using(var path=VisualTheme.Round(new Rectangle((int)(p*scale),(int)(barY*scale),progressWidth,(int)trackHeight),(int)Math.Ceiling(trackHeight/2)))
             using(var progress=new SolidBrush(fresh?VisualTheme.Mint:VisualTheme.Warning))g.FillPath(progress,path);
-            if(tall&&wide)
+            if(tall&&wide&&h<212)
+            {
+                TextLine(g,"Codex "+Snapshot.Compact(snapshot.A),11,muted,p,barY+14,w*.52F-p,18,false,false);
+                TextLine(g,"DSH "+Snapshot.Compact(deepseek.A),11,muted,split+12,barY+14,w-split-p-12,18,false,false);
+            }
+            else if(tall&&wide)
             {
                 TextLine(g,"Codex 累计 token",11,muted,p,barY+15,w*.52F-p,18,false,false);
                 TextLine(g,Snapshot.Compact(snapshot.A),h>=270?22:17,VisualTheme.WidgetText,p,barY+37,w*.52F-p,29,false,true);
                 TextLine(g,"DSH 今日 token",11,muted,split+12,barY+15,w-split-p-12,18,false,false);
                 TextLine(g,Snapshot.Compact(deepseek.A),h>=270?22:17,VisualTheme.WidgetText,split+12,barY+37,w-split-p-12,29,false,true);
             }
-            else if(tall&&h>=212)
+            else if(tall&&h>=240)
             {
                 TextLine(g,"Codex 累计  "+Snapshot.Compact(snapshot.A),11,muted,p,barY+65,w-p*2,20,false,false);
-                if(h>=260)TextLine(g,"DSH 今日  "+Snapshot.Compact(deepseek.A),11,muted,p,barY+91,w-p*2,20,false,false);
+                if(h>=300)TextLine(g,"DSH 今日  "+Snapshot.Compact(deepseek.A),11,muted,p,barY+91,w-p*2,20,false,false);
             }
-            if(wide&&!tall)TextLine(g,"本机 "+Snapshot.Compact(snapshot.A),11,muted,w*.65F,h-23,w*.35F-p,17,true,false);
-            float timeWidth=wide&&!tall?w*.64F-p:contentW;
-            TextLine(g,TimingSummary,11,announcement!=null&&!announcementStale?VisualTheme.Mint:muted,p,h-23,timeWidth,17,false,false);
+            float telemetryY=h-43,statusWidth=contentW*.52F;
+            TextLine(g,StatusLine,10,officialStatus.Unhealthy?VisualTheme.Warning:muted,p,telemetryY,statusWidth,16,false,false);
+            TextLine(g,SpeedLine,10,speedStatus.Stale?muted:VisualTheme.Mint,p+statusWidth,telemetryY,contentW-statusWidth,16,true,false);
+            TextLine(g,TimingSummary,11,announcement!=null&&!announcementStale?VisualTheme.Mint:muted,p,h-20,contentW,16,false,false);
         }
         void TextLine(Graphics g,string text,float size,Color color,float x,float y,float width,float height,bool right,bool numeric)
         {

@@ -1,13 +1,12 @@
-## Quota trends and anomaly review
+## OpenAI status and output speed
 
-- Open Details and Trends from the dashboard or widget context menu.
-- Plot sampled remaining quota for primary and secondary windows across 6 hours, 24 hours, 7 days or available loaded history.
-- Show observed percentage-point declines, recent speed and evidence for rapid changes or quota changes without observed token growth.
-- Separate resets, restoration, window changes, account changes and missing samples. Never infer device ownership or billing abuse from quota percentages.
-- Configure the rapid-change threshold, inspect event evidence and retain the original text report.
-- Read existing SQLite history without changing the recorder, database schema, Windows settings or model sessions. Bound history to the latest 30,000 samples.
-- Retain records, pairing, account paths, pause state, themes, widget size and transparency.
-- Keep UTF-8 update decoding and ASCII release metadata for old-client compatibility.
+- Monitor official Codex and ChatGPT Work components every 60 seconds without blocking the UI.
+- Show service health and approximate local output tokens/second in every widget size.
+- Refresh the 30-minute per-response effective rate every 15 seconds. Include reasoning and model-phase waiting; exclude explicit tool execution. This is not pure decode TPS.
+- Retain stale values on failure; show unknown or pending when evidence is missing. Never treat failed status checks as normal or missing speed as zero.
+- Provide scoped incident links, coverage details and optional deduplicated degradation/recovery notifications.
+- Read existing response metadata and SQLite databases without writes. No inference requests or account data sent to the status service.
+- Preserve records, recorder continuity, pairing, pause state, themes, widget dimensions and transparency.
+- Keep UTF-8 update parsing and ASCII release metadata for old-client compatibility.
 
-Validation covers calm usage, isolated jumps, reset boundaries, account switches, gaps, failed/invalid/future/duplicate samples, acceleration, correlation coverage, read-only database access, native detail rendering and upgrade retention.
-Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.
+Existing users: use Check and Update after publication. Manual installation: run UsageObserver-Setup.exe.
