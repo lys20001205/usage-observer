@@ -2,3 +2,5 @@ work/
 src/*.exe
 src/*.pdb
 *.user
+__pycache__/
+*.py[cod]

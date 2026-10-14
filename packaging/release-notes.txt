@@ -1,13 +1,12 @@
-## Quota trends and anomaly review
+## Private GitHub device sync
 
-- Open Details and Trends from the dashboard or widget context menu.
-- Plot sampled remaining quota for primary and secondary windows across 6 hours, 24 hours, 7 days or available loaded history.
-- Show observed percentage-point declines, recent speed and evidence for rapid changes or quota changes without observed token growth.
-- Separate resets, restoration, window changes, account changes and missing samples. Never infer device ownership or billing abuse from quota percentages.
-- Configure the rapid-change threshold, inspect event evidence and retain the original text report.
-- Read existing SQLite history without changing the recorder, database schema, Windows settings or model sessions. Bound history to the latest 30,000 samples.
-- Retain records, pairing, account paths, pause state, themes, widget size and transparency.
-- Keep UTF-8 update decoding and ASCII release metadata for old-client compatibility.
+- Add a GitHub Sync tab under Devices and Accounts for computers outside the same LAN, including device C.
+- Upload whitelisted hourly token/model/cache summaries and quota/reset snapshots to each device's directory in a private repository.
+- Refuse public repositories. Never upload conversations, task names, local paths, raw account IDs or Codex/DSH credentials.
+- Protect optional GitHub credentials per Windows user; never include them in the updater or share them with another computer.
+- Retain stale counts and mark offline devices. Never add shared account quota percentages or represent missing activity as zero.
+- Sync every five minutes, batch recent history, skip unchanged files and retry one conflicting file update.
+- Preserve the existing recorder, legacy A/B routing, databases, pause state, pairing, themes and widget settings.
 
-Validation covers calm usage, isolated jumps, reset boundaries, account switches, gaps, failed/invalid/future/duplicate samples, acceleration, correlation coverage, read-only database access, native detail rendering and upgrade retention.
-Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.
+Existing users: use Check and Update, then Devices and Accounts -> GitHub Sync. Initial private repository access must be configured separately on each computer.
+Validation covers private-only writes, privacy filtering, offline records, read-only mode, idempotence, failed-upload recovery, credential protection and upgrade compatibility.

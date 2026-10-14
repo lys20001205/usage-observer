@@ -1,7 +1,7 @@
-﻿param([string]$OutputDirectory)
+param([string]$OutputDirectory)
 $ErrorActionPreference='Stop'
 $repoRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$version='1.0.4.11'
+$version='1.0.4.12'
 $buildRoot=Join-Path $repoRoot ('work\release-'+$version)
 New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
 if(!$OutputDirectory){$OutputDirectory=Join-Path $buildRoot 'artifacts'}
@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 # text ASCII until all supported clients explicitly decode UTF-8.
 $releaseBody=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'release-notes.txt'),[Text.Encoding]::UTF8)
 if($releaseBody -match '[^\x00-\x7F]'){throw 'Release notes must remain ASCII for old-updater compatibility'}
-@{tag_name=('v'+$version);name=('UsageObserver '+$version+' - Quota trends and anomaly review');body=$releaseBody;draft=$true;prerelease=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'release-metadata.json') -Encoding ASCII
+@{tag_name=('v'+$version);name=('UsageObserver '+$version+' - Private GitHub device sync');body=$releaseBody;draft=$true;prerelease=$false} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDirectory 'release-metadata.json') -Encoding ASCII
 $baseline=Join-Path $buildRoot 'UsageObserver-Setup-1.0.4.1.exe'
 if(!(Test-Path -LiteralPath $baseline)){Invoke-WebRequest -Uri 'https://github.com/lys20001205/usage-observer/releases/download/v1.0.4.1/UsageObserver-Setup.exe' -OutFile $baseline -TimeoutSec 120}
 if((Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash -ne '6B172C478B81D98E5E273BB603A6F70A67D33A461DAD13C2D9C4DAC1E9AA1BE9'){throw 'Baseline installer SHA-256 mismatch'}
@@ -32,11 +32,14 @@ foreach($file in $manifest.files){
 & (Join-Path $repoRoot 'src\build-ui.ps1')
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src') -File){Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $app $file.Name) -Force}
 Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md') -Destination (Join-Path $stage 'README.md') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'GITHUB-SYNC.md') -Destination (Join-Path $stage 'GITHUB-SYNC.md') -Force
 # Keep the published, rollback-capable installation script and bundled runtimes.
 # Normalize its shortcut label without touching existing user shortcuts.
 $installer=Join-Path $stage 'install.ps1'
 $text=Get-Content -LiteralPath $installer -Raw -Encoding UTF8
 $text=$text.Replace("(Join-Path `$PSScriptRoot 'manifest.json') -Raw |","(Join-Path `$PSScriptRoot 'manifest.json') -Raw -Encoding UTF8 |")
+$text=$text.Replace("`$_.CommandLine.Contains((Join-Path `$targetRoot 'monitor.py'))","(`$_.CommandLine.Contains((Join-Path `$targetRoot 'monitor.py')) -or `$_.CommandLine.Contains((Join-Path `$targetRoot 'github_sync.py')))")
+$text=$text.Replace("Set-Content -LiteralPath (Join-Path `$dataRoot 'stop.request')", "Set-Content -LiteralPath (Join-Path `$dataRoot 'github-sync-stop.request') -Value 'Installer update requested' -Encoding UTF8`r`n        Set-Content -LiteralPath (Join-Path `$dataRoot 'stop.request')")
 $text=[regex]::Replace($text,"(?m)^\s*\`$shortcutPath=Join-Path .*?$",'        $shortcutPath=Join-Path ([Environment]::GetFolderPath(''Desktop'')) ''UsageObserver.lnk''')
 [IO.File]::WriteAllText($installer,$text,(New-Object Text.UTF8Encoding($true)))
 @('@echo off','powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0install.ps1"') | Set-Content -LiteralPath (Join-Path $stage 'Install.cmd') -Encoding ASCII

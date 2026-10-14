@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -31,10 +31,11 @@ namespace CodexUsageTray
         {
             AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;root=data;Text="UsageObserver · 设备与账号";ClientSize=new Size(920,668);BackColor=VisualTheme.Canvas;Font=new Font("Microsoft YaHei UI",9);StartPosition=FormStartPosition.CenterScreen;
             VisualTheme.Text(this,"设备与账号",24,20,580,38,21,VisualTheme.Ink,true);
-            VisualTheme.Text(this,"每台设备独立记录，同一局域网内安全共享",26,63,850,22,8.5F,VisualTheme.Muted);
+            VisualTheme.Text(this,"每台设备独立记录，支持局域网共享与私有 GitHub 同步",26,63,850,22,8.5F,VisualTheme.Muted);
             MinimumSize=new Size(936,707);
             var tabs=new TabControl {Bounds=new Rectangle(16,101,888,548),Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right};Controls.Add(tabs);
             var page=new TabPage("设备");var prefs=new TabPage("配对与账号");tabs.TabPages.Add(page);tabs.TabPages.Add(prefs);
+            var cloud=new TabPage("GitHub 同步");cloud.Controls.Add(new GitHubSyncPanel(root));tabs.TabPages.Add(cloud);
             state=new Label { Location=new Point(20,18),Size=new Size(838,27),ForeColor=VisualTheme.Accent };page.Controls.Add(state);
             var info=new Label { Location=new Point(20,54),Size=new Size(838,40),ForeColor=VisualTheme.Muted,Font=new Font("Microsoft YaHei UI",8.5F),Text="自动发现同一局域网内运行本程序的电脑；同组配对后共享摘要。\n每台电脑的记录起点独立；token 是该电脑所选日志目录的记录，可包含多个登录账户。额度/余额分别显示，不能相加。" };page.Controls.Add(info);
             devices=new DataGridView { Location=new Point(20,107),Size=new Size(838,291),ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,RowHeadersVisible=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect };page.Controls.Add(devices);
