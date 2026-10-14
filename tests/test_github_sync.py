@@ -80,6 +80,10 @@ class Tests(unittest.TestCase):
         with self.assertRaises(sync.SyncError):sync.GitHub('owner/../other','fictional')
     def test_redirect_does_not_forward_credentials(self):
         with self.assertRaises(sync.SyncError):sync.NoRedirect().redirect_request(None,None,None,None,None,'https://other.example')
+    def test_network_codec_closure(self):
+        self.assertEqual('api.github.com'.encode('idna'),b'api.github.com')
+        import stringprep,unicodedata
+        self.assertEqual(unicodedata.ucd_3_2_0.normalize('NFC','Github'),'Github')
     def test_conflicting_put_refetches_current_sha_once(self):
         class Conflict(sync.GitHub):
             def __init__(self): super().__init__(FakeAPI.repository,'fictional');self.reads=0;self.puts=0

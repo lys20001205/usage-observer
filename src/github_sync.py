@@ -111,7 +111,7 @@ def credential(data,settings):
         exe=shutil.which('git')
         if not exe: raise SyncError('git_login_unavailable')
         env=dict(os.environ,GCM_INTERACTIVE='never',GCM_GUI_PROMPT='false',GIT_TERMINAL_PROMPT='0')
-        p=subprocess.run([exe,'-c','credential.interactive=never','credential','fill'],input='protocol=https\nhost=github.com\n\n',capture_output=True,text=True,env=env,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+        p=subprocess.run([exe,'-c','credential.interactive=never','credential','fill'],input='protocol=https\nhost=github.com\n\n',capture_output=True,text=True,encoding='utf-8',errors='replace',env=env,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         values=dict(line.split('=',1) for line in p.stdout.splitlines() if '=' in line)
         if p.returncode or not values.get('password'): raise SyncError('git_login_unavailable')
         return values['password']

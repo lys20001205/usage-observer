@@ -1,4 +1,4 @@
-param([string]$OutputDirectory)
+param([string]$OutputDirectory,[string]$NetworkingPython)
 $ErrorActionPreference='Stop'
 $repoRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $version='1.0.4.12'
@@ -29,6 +29,10 @@ foreach($file in $manifest.files){
  if(!$path.StartsWith($app+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid baseline package path'}
  if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $file.sha256){throw ('Baseline file hash mismatch: '+$file.path)}
 }
+if(!$NetworkingPython){$NetworkingPython=$env:USAGE_OBSERVER_BUILD_PYTHON}
+if(!$NetworkingPython){throw 'Pass -NetworkingPython with a complete Windows x64 CPython 3.12 executable'}
+& $NetworkingPython (Join-Path $PSScriptRoot 'prepare-network-runtime.py') --target (Join-Path $app 'runtime\python')
+if($LASTEXITCODE -ne 0){throw 'Networking runtime dependency preparation failed'}
 & (Join-Path $repoRoot 'src\build-ui.ps1')
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src') -File){Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $app $file.Name) -Force}
 Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md') -Destination (Join-Path $stage 'README.md') -Force

@@ -53,6 +53,8 @@ Windows 10/11 x64 的 Codex 与 DeepSeek DSH 用量浮窗。第三方本地工�
 
 ## 发布构建
 
+1.0.4.12 的构建需传入 `-NetworkingPython <完整 Windows x64 CPython 3.12 的 python.exe>`，将标准库 IDNA、stringprep 与 unicodedata 依赖加入隔离安装包。不会修改提供依赖的 Python 或现有已安装运行时。用户安装新版时无需另外安装 Python。
+
 运行 `packaging/build-release.ps1 -OutputDirectory <输出目录>` 生成完整的 `UsageObserver-Setup.exe` 和 `UsageObserver-Windows-x64.zip`。构建从 SHA-256 固定的 v1.0.4.1 安装包获取原采集后端及许可证/运行时，逐文件验证，再编译当前界面与安装器。用户记录和设置不进入构建。安装脚本保留原文件校验、备份与回滚流程；支持隔离验证、普通安装及现有 UpdateHelper 的自动更新协议。
 
 远端“检查更新”只读取最新正式 GitHub Release 的 `UsageObserver-Setup.exe` 附件，不读取 main 分支的源码提交。发布必须包含该完整安装附件。
