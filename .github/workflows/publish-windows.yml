@@ -1,0 +1,37 @@
+name: Publish validated Windows package
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Existing owned draft release ID
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: usage-observer-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Build complete package and verify bundled runtime
+        shell: pwsh
+        run: |
+          ./packaging/build-release.ps1 -OutputDirectory "$env:RUNNER_TEMP/release" -NetworkingPython (Get-Command python).Source
+          $evidence=Get-Content ./work/release-1.0.4.12/build-evidence.json -Raw | ConvertFrom-Json
+          & (Join-Path $evidence.stage 'app/runtime/python/python.exe') -m unittest discover -s tests -v
+          if($LASTEXITCODE -ne 0){throw 'Bundled runtime checks failed'}
+          & (Join-Path $evidence.stage 'install.ps1') -CheckOnly -InstallDirectory "$env:RUNNER_TEMP/check-install" -DataDirectory "$env:RUNNER_TEMP/check-data"
+      - name: Publish verified artifacts to existing draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: python ./packaging/publish-ci-release.py
