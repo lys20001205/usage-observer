@@ -26,6 +26,8 @@ if($CheckOnly){Write-Output ('Verified: '+$manifest.version+' / '+$files.Count+'
 $updates=@($files | Where-Object {!(Test-Path -LiteralPath $_.Destination) -or (Read-Sha256 $_.Destination) -ne $_.Hash})
 $recorderChanges=@($updates | Where-Object {$_.Relative -match '^(runtime[/\\]|node_modules[/\\]|monitor\.py$|collector\.py$|portable\.py$|quota_core\.py$|deepseek|lan-agent|start\.ps1$|stop\.ps1$)'})
 $stopRecorder=$recorderChanges.Count -gt 0
+$syncChanges=@($updates | Where-Object {$_.Relative -match '^(runtime[/\\]|github_sync\.py$)'})
+$stopSync=$syncChanges.Count -gt 0
 
 $mutexKey=[Text.Encoding]::UTF8.GetBytes($targetRoot.ToLowerInvariant());$sha=[Security.Cryptography.SHA256]::Create()
 $mutexName='Local\UsageObserver_Install_'+[BitConverter]::ToString($sha.ComputeHash($mutexKey)).Replace('-','');$sha.Dispose()
@@ -41,14 +43,18 @@ try{
         $backed+=@{Source=$backupFile;Destination=$file.Destination}
     }}
     if(Test-Path -LiteralPath $canonicalExe){
-        $knownProcesses=@(Get-CimInstance Win32_Process | Where-Object {($_.ExecutablePath -eq $canonicalExe) -or ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $targetRoot 'monitor.py')))})
+        $knownProcesses=@(Get-CimInstance Win32_Process | Where-Object {($_.ExecutablePath -eq $canonicalExe) -or ($_.CommandLine -and ($_.CommandLine.Contains((Join-Path $targetRoot 'monitor.py')) -or $_.CommandLine.Contains((Join-Path $targetRoot 'github_sync.py'))))})
         $uiWasRunning=@($knownProcesses | Where-Object {$_.ExecutablePath -eq $canonicalExe}).Count -gt 0
         $env:USAGE_OBSERVER_DATA=$dataRoot
         New-Item -ItemType Directory -Path $dataRoot -Force | Out-Null
         Start-Process -FilePath $canonicalExe -ArgumentList '--quit-ui' -WindowStyle Hidden -Wait
+        if($stopSync){Set-Content -LiteralPath (Join-Path $dataRoot 'github-sync-stop.request') -Value 'Installer update requested' -Encoding UTF8}
         if($stopRecorder){Set-Content -LiteralPath (Join-Path $dataRoot 'stop.request') -Value 'Installer update requested' -Encoding UTF8}
         foreach($process in $knownProcesses){
-            if($process.ExecutablePath -ne $canonicalExe -and !$stopRecorder){continue}
+            if($process.ExecutablePath -ne $canonicalExe){
+                $isSync=$process.CommandLine.Contains((Join-Path $targetRoot 'github_sync.py'))
+                if(($isSync -and !$stopSync) -or (!$isSync -and !$stopRecorder)){continue}
+            }
             $instance=Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue
             if($instance -and -not $instance.WaitForExit(60000)){throw 'Existing recorder is still finishing a read; no files were replaced. Retry shortly.'}
         }

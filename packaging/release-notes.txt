@@ -9,4 +9,6 @@
 - Preserve records, recorder continuity, pairing, pause state, themes, widget dimensions and transparency.
 - Keep UTF-8 update parsing and ASCII release metadata for old-client compatibility.
 
-Existing users: use Check and Update after publication. Manual installation: run UsageObserver-Setup.exe.
+Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.
+
+Includes the existing private GitHub device sync feature from 1.0.4.12.

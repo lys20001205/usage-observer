@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -381,7 +381,7 @@ namespace CodexUsageTray
             window.ThemeColors.Click+=delegate{ShowThemeWindow();};
             menu.Items.Add("全局重置预告与提醒", null, delegate { ShowResetWindow(); });
             window.ResetAnnouncements.Click+=delegate {ShowResetWindow();};
-            menu.Items.Add("局域网设备与账号设置", null, delegate { new NetworkForm(root).Show(); });
+            menu.Items.Add("设备与账号 / GitHub 同步", null, delegate { new NetworkForm(root).Show(); });
             menu.Items.Add("检查程序更新", null, delegate { new UpdateForm(root).Show(); });
             menu.Items.Add("OpenAI 状态与输出速度",null,delegate{if(serviceHealthWindow==null||serviceHealthWindow.IsDisposed)serviceHealthWindow=new ServiceHealthForm(serviceHealth);serviceHealthWindow.Show(window.Visible?window:null);});
             var statusAlerts=new ToolStripMenuItem("OpenAI 状态变化提醒"){CheckOnClick=true,Checked=serviceHealth.Alerts};statusAlerts.CheckedChanged+=delegate{serviceHealth.Alerts=statusAlerts.Checked;serviceHealth.Save();};menu.Items.Add(statusAlerts);
@@ -558,6 +558,15 @@ namespace CodexUsageTray
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             VisualTheme.ApplyTheme(ThemeSettings.Load(root));
             if (args.Length > 0 && args[0] == "--self-test") return SelfTest(root, args.Length > 1 ? args[1] : null);
+            if(args.Length>1&&args[0]=="--sync-preview")
+            {
+                using(var form=new NetworkForm(root))
+                {
+                    foreach(Control control in form.Controls)if(control is TabControl)((TabControl)control).SelectedIndex=2;
+                    CreateHandles(form);form.PerformLayout();PreviewHost.Render(form,args[1]);
+                }
+                return 0;
+            }
             if(args.Length>1&&args[0]=="--composition-test")return CompositionValidation.Run(args[1]);
             if(args.Length>2&&args[0]=="--history-check")
             {
@@ -584,7 +593,7 @@ namespace CodexUsageTray
             using (var mutex = new Mutex(true, "Local\\CodexUsageTray_" + Hash(root), out created))
             {
                 if (!created) return 0;
-                try { Application.Run(new TrayContext(root)); return 0; }
+                try { GitHubSyncRuntime.Ensure(root);Application.Run(new TrayContext(root)); return 0; }
                 catch (Exception e) { File.AppendAllText(Path.Combine(root, "tray-errors.log"), DateTimeOffset.Now.ToString("o") + " " + e + Environment.NewLine); return 1; }
                 finally { mutex.ReleaseMutex(); }
             }

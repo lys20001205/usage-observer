@@ -3,4 +3,4 @@ src/*.exe
 src/*.pdb
 *.user
 __pycache__/
-*.pyc
+*.py[cod]
