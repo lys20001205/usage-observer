@@ -1,14 +1,12 @@
-## OpenAI status and output speed
+## Output speed now measures generation, not queueing
 
-- Monitor official Codex and ChatGPT Work components every 60 seconds without blocking the UI.
-- Show service health and approximate local output tokens/second in every widget size.
-- Refresh the 30-minute per-response effective rate every 15 seconds. Include reasoning and model-phase waiting; exclude explicit tool execution. This is not pure decode TPS.
-- Retain stale values on failure; show unknown or pending when evidence is missing. Never treat failed status checks as normal or missing speed as zero.
-- Provide scoped incident links, coverage details and optional deduplicated degradation/recovery notifications.
-- Read existing response metadata and SQLite databases without writes. No inference requests or account data sent to the status service.
-- Preserve records, recorder continuity, pairing, pause state, themes, widget dimensions and transparency.
-- Keep UTF-8 update parsing and ASCII release metadata for old-client compatibility.
+- Fix the local output tokens/second figure. It divided a response's output tokens by the time since the previous tool result or model response, so silence spent queueing, pacing or waiting on rate limits was charged to the model: a session producing 60-80 tokens per second could be displayed as 3-12, and one throttled session dominated the whole 30-minute window.
+- The measured window is now bounded by the model output items the client records for each response. It starts one item duration before the first observed item, that duration comes from the session's own item cadence, and it is only used when at least three plausible gaps exist; otherwise the previous phase anchor is kept, which is the old behaviour.
+- Waiting is reported separately as waiting_seconds instead of being counted as generation, and per-response median_tps, excluded_responses and waiting_seconds were added to the local status JSON. Windows shorter than one second, responses below 32 output tokens and physically impossible rates are excluded rather than clamped.
+- A response's trailing item is written just after its own usage record; it is no longer mistaken for the first item of the following response, which previously hid that response's waiting.
+- Reasoning is still included and explicit tool execution still excluded. This remains an observed generation rate, not pure decode TPS.
+- Add three regression tests for pre-first-item waiting, the trailing item and the no-cadence fallback. All 23 probe tests pass.
 
 Existing users: use Check and Update. Manual installation: run UsageObserver-Setup.exe.
 
-Includes the existing private GitHub device sync feature from 1.0.4.12.
+Includes the OpenAI status feature from 1.0.4.13 and the existing private GitHub device sync feature from 1.0.4.12.

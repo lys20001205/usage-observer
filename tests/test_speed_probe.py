@@ -64,4 +64,22 @@ class ProbeTests(unittest.TestCase):
   self.db.unlink();d=self.probe();self.assertIsNone(d['effective_tps']);self.assertEqual(d['error'],'no_database')
  def test_invalid_reasoning_subset(self):
   self.start();self.response('r',NOW-280,200,201);self.assertIsNone(self.probe()['effective_tps'])
+ def test_waiting_before_first_item_is_not_generation(self):
+  self.start(NOW-1800);self.append(NOW-1700,'response_item',dict(type='custom_tool_call_output',output='fixture'))
+  for offset in (140,130,120,110,100):self.append(NOW-offset,'response_item',dict(type='reasoning'))
+  self.response('r',NOW-90,1200,600);d=self.probe()
+  self.assertEqual(d['effective_tps'],20);self.assertEqual(d['waiting_seconds'],1550);self.assertEqual(d['median_tps'],20)
+ def test_trailing_item_after_usage_is_not_the_next_start(self):
+  self.start(NOW-1600);self.append(NOW-1500,'response_item',dict(type='custom_tool_call_output',output='fixture'))
+  for offset in (140,130,120,110,100):self.append(NOW-offset,'response_item',dict(type='reasoning'))
+  self.response('r1',NOW-90,1200,600)
+  self.append(NOW-89.5,'response_item',dict(type='message'))
+  for offset in (40,30,20,10):self.append(NOW-offset,'response_item',dict(type='reasoning'))
+  self.response('r2',NOW-5,600,300);d=self.probe()
+  self.assertAlmostEqual(d['effective_tps'],1800/105,places=3);self.assertEqual(d['waiting_seconds'],1390)
+ def test_no_item_cadence_falls_back_to_anchor(self):
+  self.start(NOW-280);self.append(NOW-270,'response_item',dict(type='custom_tool_call_output',output='fixture'))
+  for offset in (10,9.9,9.8,9.7,9.6):self.append(NOW-offset,'response_item',dict(type='reasoning'))
+  self.response('r',NOW-9,100,50);d=self.probe()
+  self.assertAlmostEqual(d['effective_tps'],100/261,places=3)
 if __name__=='__main__':unittest.main(verbosity=1)

@@ -29,7 +29,7 @@ namespace CodexUsageTray
         public bool Stale {get{return Error.Length>0||Checked==DateTimeOffset.MinValue||Checked>DateTimeOffset.UtcNow.AddMinutes(1)||DateTimeOffset.UtcNow-Checked>TimeSpan.FromSeconds(60);}}
         static string Number(double value){return (value>=1000000?value/1000000:value>=1000?value/1000:value).ToString(value>=1000?"0.#":"0.0",System.Globalization.CultureInfo.InvariantCulture)+(value>=1000000?"M":value>=1000?"K":"");}
         public string Compact {get{return Effective.HasValue?(Stale?"旧 ":"≈")+Number(Effective.Value)+" t/s":"待 t/s";}}
-        public string Detail {get{return "近30分单请求有效输出（含思考和等待，不含显式工具运行；非纯生成速度）\r\n"+Compact+"；有效样本 "+Samples+"；覆盖 "+Matched+" / "+Recorded+"\r\n最近响应："+LastResponse+"\r\n"+Models+(Error.Length>0?"\r\n速度读取失败："+Error:"");}}
+        public string Detail {get{return "近30分单请求生成窗口有效输出（含思考；剔除首项前的静默等待与显式工具运行；非端到端速度）\r\n"+Compact+"；有效样本 "+Samples+"；覆盖 "+Matched+" / "+Recorded+"\r\n最近响应："+LastResponse+"\r\n"+Models+(Error.Length>0?"\r\n速度读取失败："+Error:"");}}
     }
     internal sealed class ServiceHealth : IDisposable
     {

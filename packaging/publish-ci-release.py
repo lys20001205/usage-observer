@@ -4,7 +4,7 @@ root=pathlib.Path(__file__).resolve().parents[1]
 repo=os.environ['GITHUB_REPOSITORY']; assert repo=='lys20001205/usage-observer'
 token=os.environ['GH_TOKEN']; source=os.environ['GITHUB_SHA']; release_id=int(os.environ['RELEASE_ID'])
 out=pathlib.Path(os.environ['RUNNER_TEMP'])/'release'
-build=json.loads((root/'work/release-1.0.4.13/build-evidence.json').read_text(encoding='utf-8-sig'))
+build=json.loads((root/'work/release-1.0.4.14/build-evidence.json').read_text(encoding='utf-8-sig'))
 metadata=json.loads((out/'release-metadata.json').read_text(encoding='utf-8-sig'))
 base='https://api.github.com/repos/'+repo
 def request(method,url,payload=None,file=None):

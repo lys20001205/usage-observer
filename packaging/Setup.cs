@@ -6,11 +6,11 @@ using System.Reflection;
 using System.Text;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
-[assembly: AssemblyVersion("1.0.4.13")]
-[assembly: AssemblyFileVersion("1.0.4.13")]
+[assembly: AssemblyVersion("1.0.4.14")]
+[assembly: AssemblyFileVersion("1.0.4.14")]
 internal static class Setup
 {
-    const string Version="1.0.4.13";
+    const string Version="1.0.4.14";
     static string Quote(string path)
     {
         if(path.IndexOfAny(new[]{'"','\r','\n','\0'})>=0)throw new ArgumentException("Invalid path argument");

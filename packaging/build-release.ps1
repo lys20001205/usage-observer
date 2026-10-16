@@ -1,7 +1,7 @@
-﻿param([string]$OutputDirectory,[string]$NetworkingPython)
+param([string]$OutputDirectory,[string]$NetworkingPython)
 $ErrorActionPreference='Stop'
 $repoRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$version='1.0.4.13'
+$version='1.0.4.14'
 $buildRoot=Join-Path $repoRoot ('work\release-'+$version)
 New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
 if(!$OutputDirectory){$OutputDirectory=Join-Path $buildRoot 'artifacts'}
