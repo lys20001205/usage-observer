@@ -22,7 +22,7 @@ namespace CodexUsageTray
     }
     internal static class Updates
     {
-        public const string VersionText = "1.0.4.14";
+        public const string VersionText = "1.0.4.16";
         static object Get(Dictionary<string,object> d, string k) { object v; return d.TryGetValue(k,out v)?v:null; }
         internal static WebClient CreateClient()
         {

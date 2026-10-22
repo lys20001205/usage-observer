@@ -29,7 +29,7 @@ namespace CodexUsageTray
         public bool Stale {get{return Error.Length>0||Checked==DateTimeOffset.MinValue||Checked>DateTimeOffset.UtcNow.AddMinutes(1)||DateTimeOffset.UtcNow-Checked>TimeSpan.FromSeconds(60);}}
         static string Number(double value){return (value>=1000000?value/1000000:value>=1000?value/1000:value).ToString(value>=1000?"0.#":"0.0",System.Globalization.CultureInfo.InvariantCulture)+(value>=1000000?"M":value>=1000?"K":"");}
         public string Compact {get{return Effective.HasValue?(Stale?"旧 ":"≈")+Number(Effective.Value)+" t/s":"待 t/s";}}
-        public string Detail {get{return "近30分单请求生成窗口有效输出（含思考；剔除首项前的静默等待与显式工具运行；非端到端速度）\r\n"+Compact+"；有效样本 "+Samples+"；覆盖 "+Matched+" / "+Recorded+"\r\n最近响应："+LastResponse+"\r\n"+Models+(Error.Length>0?"\r\n速度读取失败："+Error:"");}}
+        public string Detail {get{return "近30分单请求生成窗口有效输出（含思考；剔除首项前的静默等待与显式工具运行；非端到端速度）\r\n"+Compact+"；有效样本 "+Samples+"；覆盖 "+Matched+" / "+Recorded+"\r\n最近响应："+MachineTime.Timestamp(LastResponse)+"\r\n"+Models+(Error.Length>0?"\r\n速度读取失败："+Error:"");}}
     }
     internal sealed class ServiceHealth : IDisposable
     {
@@ -159,7 +159,7 @@ namespace CodexUsageTray
                 if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);
             }catch(Exception error){BackgroundLifetime.Log("service_health_save_failed "+error.GetType().Name);}
         }
-        public string Detail {get{return Status.Compact+"\r\n"+Status.Description+"\r\n官方状态检查："+(Status.Checked==DateTimeOffset.MinValue?"等待查询":Status.Checked.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm:ss 北京时间"))+(Status.Error.Length>0?"\r\n查询失败："+Status.Error:"")+"\r\n\r\n"+Speed.Detail+"\r\n\r\n官方状态每60秒检查；速度每15秒刷新。官方状态是服务整体报告，不能单独诊断你的网络。";}}
+        public string Detail {get{return Status.Compact+"\r\n"+Status.Description+"\r\n官方状态检查："+(Status.Checked==DateTimeOffset.MinValue?"等待查询":MachineTime.DescribeFull(Status.Checked))+(Status.Error.Length>0?"\r\n查询失败："+Status.Error:"")+"\r\n\r\n"+Speed.Detail+"\r\n\r\n官方状态每60秒检查；速度每15秒刷新。官方状态是服务整体报告，不能单独诊断你的网络。";}}
         public void Dispose(){disposed=true;}
         internal static void SelfTest()
         {

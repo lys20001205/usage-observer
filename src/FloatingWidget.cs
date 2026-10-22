@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.Drawing.Drawing2D;
@@ -173,7 +173,7 @@ namespace CodexUsageTray
                     else return announcementStale?"旧预告待确认":"预告待确认";
                     if(announcementStale)prefix=exact.HasValue&&announcement.ShortTiming.StartsWith("最晚 ")?"旧预最晚 ":"旧预 ";
                 }
-                return prefix+time.ToOffset(TimeSpan.FromHours(8)).ToString("M/d H:mm")+" 北京";
+                return prefix+MachineTime.Format(time,"M/d H:mm")+" 本地";
             }
         }
         string BalanceText

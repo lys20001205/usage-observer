@@ -1,3 +1,19 @@
+## Automatic machine time zones
+
+- Convert forecasts, reset displays, status checks and response details using the running machine's Windows time zone and the event date's daylight-saving rule. Refresh zone information after a Windows time-zone change.
+- Display local-time labels and explicit UTC offsets in details. Preserve stored UTC timestamps and notification fingerprints.
+- Use local calendar midnight for DSH daily totals and daily alert deduplication.
+- Include a backed-up, offline-only legacy A/B recorder upgrade helper. Remote initialization failures no longer stop local collection, and existing authorization checks remain enforced.
+
+## Timely reset announcements and account quota recovery alerts
+
+- Check immediately on launch, every 60 seconds normally and every 30 seconds with a forecast. Retry feed failures after 15 seconds instead of one hour.
+- Recognize short forecast replies such as "Lands tomorrow before 10am PST." Keep relative or community-estimated times advisory.
+- Notify about fresh community records even if primary-post verification times out, with an explicit unverified label. Never turn them into confirmed global resets.
+- Cache verified primary text against stable feed text, deduplicate across restarts, prioritize the newest notice, and suppress source snapshots older than 15 minutes. The upstream feed normally polls every five minutes.
+- Independently alert when consecutive fresh account snapshots show at least a five-percentage-point quota recovery within three minutes. Ignore failed, stale, out-of-order, changed-window and small-jitter samples; do not attribute recovery to a global reset.
+- Preserve existing alert preferences, recorder, records, pairing, theme, widget geometry and transparency.
+
 ## Output speed now measures generation, not queueing
 
 - Fix the local output tokens/second figure. It divided a response's output tokens by the time since the previous tool result or model response, so silence spent queueing, pacing or waiting on rate limits was charged to the model: a session producing 60-80 tokens per second could be displayed as 3-12, and one throttled session dominated the whole 30-minute window.

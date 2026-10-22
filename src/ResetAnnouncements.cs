@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,7 +16,7 @@ namespace CodexUsageTray
 {
     internal sealed class ResetNotice
     {
-        public string Id, State, Text, SourceUrl, Estimate, Evidence;
+        public string Id, State, Text, SourceUrl, Estimate, Evidence, FeedText;
         public string PublishedAt="";
         [ScriptIgnore] public DateTimeOffset Published { get {DateTimeOffset t;return DateTimeOffset.TryParse(PublishedAt,out t)?t:DateTimeOffset.MinValue;} set {PublishedAt=value.ToString("o");} }
         public bool Verified;
@@ -41,24 +41,31 @@ namespace CodexUsageTray
             get
             {
                 var exact=OfficialTime;DateTimeOffset t;
-                if(exact.HasValue)return (Regex.IsMatch(Text??"",@"\bby\s+\d{4}-",RegexOptions.IgnoreCase)?"最晚 ":"")+exact.Value.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm");
-                return DateTimeOffset.TryParse(Estimate,out t)?t.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm"):"等待明确时间";
+                if(exact.HasValue)return (Regex.IsMatch(Text??"",@"\bby\s+\d{4}-",RegexOptions.IgnoreCase)?"最晚 ":"")+MachineTime.Format(exact.Value,"MM-dd HH:mm");
+                return DateTimeOffset.TryParse(Estimate,out t)?MachineTime.Format(t,"MM-dd HH:mm"):"等待明确时间";
             }
         }
+        [ScriptIgnore] public string TimeZoneLabel {get{DateTimeOffset t;return MachineTime.Label(OfficialTime??(DateTimeOffset.TryParse(Estimate,out t)?t:Published));}}
         public string Fingerprint
         {
-            get { using(var sha=SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(Id+"|"+State+"|"+Estimate+"|"+Text))).Replace("-",""); }
+            get { using(var sha=SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(Id+"|"+State+"|"+Estimate+"|"+(FeedText??Text)))).Replace("-",""); }
         }
-        public string StatusText { get { return State=="completed"?"已确认完成（公共公告）":State=="rolling"?"开始传播（公共公告）":State=="scheduled"?"已预告 · 尚未确认执行":"状态待核对（社区记录）"; } }
+        public string StatusText { get { return !Verified?(State=="scheduled"?"社区收录预告 · 原帖待核对":"社区收录重置消息 · 状态待核对"):State=="completed"?"已确认完成（公共公告）":State=="rolling"?"开始传播（公共公告）":State=="scheduled"?"已预告 · 尚未确认执行":"状态待核对（社区记录）"; } }
         public string Timing
         {
             get
             {
                 DateTimeOffset t;
-                if(OfficialTime.HasValue)return "高置信预告（原帖明确）："+ShortTiming+" 北京时间；执行仍待确认";
-                return DateTimeOffset.TryParse(Estimate,out t)?"社区预计参考："+ResetMonitor.Beijing(t)+"（非官方精确时间）":"原帖未给出可确认的精确时间";
+                if(OfficialTime.HasValue)return "高置信预告（原帖明确）："+ShortTiming+" "+TimeZoneLabel+"；执行仍待确认";
+                return DateTimeOffset.TryParse(Estimate,out t)?"社区预计参考："+MachineTime.Describe(t)+"（非官方精确时间）":"原帖未给出可确认的精确时间";
             }
         }
+    }
+    internal sealed class QuotaObservation
+    {
+        public string SampleAt="";
+        public double Used;
+        public int Window;
     }
     internal sealed class ResetCache
     {
@@ -69,6 +76,7 @@ namespace CodexUsageTray
         public ResetNotice Scheduled, Latest;
         public List<string> Seen=new List<string>();
         public Dictionary<string,string> LastById=new Dictionary<string,string>();
+        public QuotaObservation Quota;
     }
     internal sealed class ResetMonitor : IDisposable
     {
@@ -78,6 +86,8 @@ namespace CodexUsageTray
         public bool Busy;
         bool disposed;
         DateTimeOffset next;
+        internal Func<string,string> DownloadText=Download;
+        internal DateTimeOffset NextCheck {get{return next;}}
         public event Action Changed;
         public event Action<string> Notification;
         public ResetMonitor(string directory)
@@ -87,9 +97,9 @@ namespace CodexUsageTray
             if(Cache==null)Cache=new ResetCache();
             if(Cache.Seen==null)Cache.Seen=new List<string>();
             if(Cache.LastById==null)Cache.LastById=new Dictionary<string,string>();
-            next=Cache.Checked.AddHours(1);
+            next=DateTimeOffset.MinValue;
+            if(DateTimeOffset.UtcNow-Cache.Checked>TimeSpan.FromMinutes(3))Cache.Stale=true;
         }
-        internal static string Beijing(DateTimeOffset t) { return t.ToOffset(TimeSpan.FromHours(8)).ToString("MM-dd HH:mm")+" 北京时间"; }
         internal static Dictionary<string,object> Map(object x) { return x as Dictionary<string,object>??new Dictionary<string,object>(); }
         internal static object Get(Dictionary<string,object> d,string key) { object v;return d!=null&&d.TryGetValue(key,out v)?v:null; }
         static string Str(Dictionary<string,object> d,string key) { return Convert.ToString(Get(d,key)); }
@@ -103,12 +113,16 @@ namespace CodexUsageTray
             if(Str(d,"reset_type")!="regular"||!SourceAllowed(Str(source,"url")))return null;
             DateTimeOffset published;
             if(!DateTimeOffset.TryParse(Str(d,"announced_at"),out published))return null;
-            return new ResetNotice {Id=Str(d,"id"),State=scheduled?"scheduled":"unknown",Text=Str(d,"text"),SourceUrl=Str(source,"url"),Published=published,Estimate=scheduled?Str(d,"scheduled_for"):"",Evidence="等待核对原帖"};
+            if(string.IsNullOrWhiteSpace(Str(d,"id"))||string.IsNullOrWhiteSpace(Str(d,"text")))return null;
+            return new ResetNotice {Id=Str(d,"id"),State=scheduled?"scheduled":"unknown",Text=Str(d,"text"),FeedText=Str(d,"text"),SourceUrl=Str(source,"url"),Published=published,Estimate=scheduled?Str(d,"scheduled_for"):"",Evidence="等待核对原帖"};
         }
         internal static string Classify(string text, bool scheduled)
         {
+            if(Regex.IsMatch(text??"",@"\b(banked|reset card|reset credit|not|never|haven't|hasn't|isn't|no reset|cancelled|canceled)\b",RegexOptions.IgnoreCase))return "unknown";
+            // Forecast slots can contain short replies with no literal "reset".
+            // This context never promotes a relative phrase to an exact time.
+            if(scheduled&&Regex.IsMatch(text??"",@"\b(lands?|landing|scheduled|tomorrow|tonight|EOD)\b",RegexOptions.IgnoreCase)&&!Regex.IsMatch(text??"",@"\b(not|never|cancelled|canceled|banked|card)\b",RegexOptions.IgnoreCase))return "scheduled";
             if(!Regex.IsMatch(text??"",@"\breset[s]?\b",RegexOptions.IgnoreCase))return "unknown";
-            if(Regex.IsMatch(text,@"\b(banked|reset card|reset credit|not|never|haven't|hasn't|isn't|no reset)\b",RegexOptions.IgnoreCase))return "unknown";
             if(Regex.IsMatch(text,@"\b(resets? (?:all )?propagated|resets? (?:has|have) been (?:applied|completed|executed)|resets? (?:is|are) (?:complete|done)|resets? completed)\b",RegexOptions.IgnoreCase))return "completed";
             if(Regex.IsMatch(text,@"\bput the reset in the bag\.\s*all propagated\b",RegexOptions.IgnoreCase))return "completed";
             if(Regex.IsMatch(text,@"\b(rolling out|propagating|started rolling)\b",RegexOptions.IgnoreCase))return "rolling";
@@ -128,11 +142,11 @@ namespace CodexUsageTray
         void Verify(ResetNotice notice, bool scheduled, ResetNotice old)
         {
             if(notice==null)return;
-            if(old!=null&&old.Verified&&old.SourceUrl==notice.SourceUrl&&old.Text==notice.Text)
-            {notice.Verified=true;notice.State=old.State;notice.Evidence=old.Evidence;return;}
+            if(old!=null&&old.Verified&&old.SourceUrl==notice.SourceUrl&&(old.FeedText??old.Text)==notice.FeedText)
+            {notice.Text=old.Text;notice.Verified=true;notice.State=old.State;notice.Evidence=old.Evidence;return;}
             try
             {
-                var json=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(Download("https://publish.twitter.com/oembed?url="+Uri.EscapeDataString(notice.SourceUrl)+"&omit_script=true"));
+                var json=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(DownloadText("https://publish.twitter.com/oembed?url="+Uri.EscapeDataString(notice.SourceUrl)+"&omit_script=true"));
                 string author=Str(json,"author_url").TrimEnd('/');
                 if(author!="https://x.com/thsottiaux"&&author!="https://twitter.com/thsottiaux")throw new IOException("原帖作者未通过核对");
                 var p=Regex.Match(Str(json,"html"),@"<p\b[^>]*>(.*?)</p>",RegexOptions.Singleline|RegexOptions.IgnoreCase);
@@ -143,12 +157,12 @@ namespace CodexUsageTray
             }
             catch(Exception e) {notice.Verified=false;notice.Evidence="原帖暂时无法核对；仅显示社区记录（"+e.GetType().Name+": "+e.Message+"）";File.AppendAllText(Path.Combine(root,"reset-errors.log"),DateTimeOffset.Now.ToString("o")+" "+e+Environment.NewLine,Encoding.UTF8);}
         }
-        ResetCache Fetch()
+        internal ResetCache Fetch()
         {
-            var response=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(Download(Feed));
+            var response=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(DownloadText(Feed));
             var fresh=Map(Get(response,"freshness"));var data=Get(response,"data")==null?response:Map(Get(response,"data"));
             if(!data.ContainsKey("latest_reset")||!response.ContainsKey("freshness"))throw new IOException("公告接口格式发生变化");
-            DateTimeOffset sourceTime;bool freshTime=DateTimeOffset.TryParse(Str(fresh,"last_success_at"),out sourceTime)&&DateTimeOffset.UtcNow-sourceTime<TimeSpan.FromHours(2)&&sourceTime<DateTimeOffset.UtcNow.AddMinutes(5);
+            DateTimeOffset sourceTime;bool freshTime=DateTimeOffset.TryParse(Str(fresh,"last_success_at"),out sourceTime)&&DateTimeOffset.UtcNow-sourceTime<TimeSpan.FromMinutes(15)&&sourceTime<DateTimeOffset.UtcNow.AddMinutes(5);
             var result=new ResetCache {Enabled=Cache.Enabled,Checked=DateTimeOffset.UtcNow,Stale=!freshTime||Get(fresh,"stale")==null||Convert.ToBoolean(Get(fresh,"stale")),SourceChecked=Str(fresh,"last_success_at"),Scheduled=ParseNotice(Get(data,"scheduled_reset"),true),Latest=ParseNotice(Get(data,"latest_reset"),false)};
             Verify(result.Scheduled,true,Cache.Scheduled);Verify(result.Latest,false,Cache.Latest);
             return result;
@@ -180,39 +194,68 @@ namespace CodexUsageTray
         }
         public void Enable(bool enabled) { Cache.Enabled=enabled;Save();ChangedNow();if(enabled)next=DateTimeOffset.MinValue; }
         public void Tick() { if(Cache.Enabled&&!Busy&&DateTimeOffset.UtcNow>=next)Check(); }
-        public async void Check()
+        public async void Check() {await CheckAsync();}
+        internal static TimeSpan PollDelay(ResetCache cache,DateTimeOffset now)
+        {
+            if(cache.Stale||!string.IsNullOrEmpty(cache.Error))return TimeSpan.FromSeconds(15);
+            var n=cache.Scheduled;
+            return TimeSpan.FromSeconds(n!=null&&now-n.Published<TimeSpan.FromHours(72)?30:60);
+        }
+        internal async Task CheckAsync()
         {
             if(Busy||disposed)return;Busy=true;ChangedNow();
             try
             {
                 var fetched=await Task.Run((Func<ResetCache>)Fetch);if(disposed)return;
-                fetched.Enabled=Cache.Enabled;fetched.Seen=Cache.Seen;fetched.LastById=Cache.LastById;Cache=fetched;
+                fetched.Enabled=Cache.Enabled;fetched.Seen=Cache.Seen;fetched.LastById=Cache.LastById;fetched.Quota=Cache.Quota;Cache=fetched;
                 var messages=Evaluate(Cache,DateTimeOffset.UtcNow);
                 Save();
-                foreach(string message in messages)
-                {
-                    File.AppendAllText(Path.Combine(root,"reset-notifications.log"),DateTimeOffset.Now.ToString("o")+" "+message+Environment.NewLine,Encoding.UTF8);
-                    if(Notification!=null)Notification(message);
-                }
+                // Old unseen history must not replace the newest forecast's
+                // balloon. Persist every fingerprint, deliver the newest item.
+                if(messages.Count>0)Notify(messages[messages.Count-1]);
             }
             catch(Exception e){Cache.Stale=true;Cache.Error="读取失败："+e.GetType().Name;Cache.Checked=DateTimeOffset.UtcNow;Save();}
-            finally {Busy=false;next=DateTimeOffset.UtcNow.AddHours(1);ChangedNow();}
+            finally {Busy=false;next=DateTimeOffset.UtcNow+PollDelay(Cache,DateTimeOffset.UtcNow);ChangedNow();}
         }
         internal static List<string> Evaluate(ResetCache cache,DateTimeOffset now)
         {
             var messages=new List<string>();if(!cache.Enabled||cache.Stale)return messages;
-            foreach(var n in new[]{cache.Scheduled,cache.Latest})
+            var notices=new List<ResetNotice>();if(cache.Scheduled!=null)notices.Add(cache.Scheduled);if(cache.Latest!=null)notices.Add(cache.Latest);
+            notices.Sort(delegate(ResetNotice a,ResetNotice b){return a.Published.CompareTo(b.Published);});
+            foreach(var n in notices)
             {
-                if(n==null||!n.Verified||n.State=="unknown"||now-n.Published>TimeSpan.FromHours(72)||n.Published>now.AddMinutes(5))continue;
+                if(!SourceAllowed(n.SourceUrl)||string.IsNullOrWhiteSpace(n.Id)||string.IsNullOrWhiteSpace(n.Text)||now-n.Published>TimeSpan.FromHours(72)||n.Published>now.AddMinutes(5))continue;
                 if(n.State=="scheduled"&&cache.Latest!=null&&cache.Latest.Verified&&cache.Latest.State=="completed"&&cache.Latest.Published>=n.Published)continue;
                 string key=n.Fingerprint;if(cache.Seen.Contains(key))continue;
                 string old;bool change=cache.LastById.TryGetValue(n.Id,out old);
-                string title=change?"重置预告更新":n.State=="completed"?"公共重置已确认完成":n.State=="rolling"?"公共重置开始传播":"发现全局重置预告";
-                messages.Add(title+"。"+n.StatusText+"；"+(n.State=="scheduled"?n.Timing:"公告时间："+Beijing(n.Published))+"。个人到账以账号额度为准。");
+                string title=!n.Verified?"社区收录重置消息（待核对）":change?"重置预告更新":n.State=="completed"?"公共重置已确认完成":n.State=="rolling"?"公共重置开始传播":"发现全局重置预告";
+                messages.Add(title+"。"+n.StatusText+"；"+(n.State=="scheduled"?n.Timing:"公告时间："+MachineTime.Describe(n.Published))+"。个人到账以账号额度为准。");
                 cache.Seen.Add(key);cache.LastById[n.Id]=key;
             }
             if(cache.Seen.Count>200)cache.Seen.RemoveRange(0,cache.Seen.Count-200);
             return messages;
+        }
+        internal static string EvaluateQuota(ResetCache cache,Snapshot snapshot,DateTimeOffset now)
+        {
+            if(snapshot.ReadFailed||snapshot.Stale||snapshot.QuotaStale||!snapshot.Used.HasValue||double.IsNaN(snapshot.Used.Value)||double.IsInfinity(snapshot.Used.Value)||snapshot.Used<0||snapshot.Used>100||snapshot.PrimaryWindow<=0||snapshot.QuotaTime>now.AddSeconds(5)||now-snapshot.QuotaTime>TimeSpan.FromMinutes(3))return null;
+            var old=cache.Quota;DateTimeOffset previous;
+            if(old!=null&&DateTimeOffset.TryParse(old.SampleAt,out previous)&&snapshot.QuotaTime<=previous)return null;
+            cache.Quota=new QuotaObservation{SampleAt=snapshot.QuotaTime.ToString("o"),Used=snapshot.Used.Value,Window=snapshot.PrimaryWindow};
+            if(!cache.Enabled||old==null||old.Window!=snapshot.PrimaryWindow||!DateTimeOffset.TryParse(old.SampleAt,out previous)||snapshot.QuotaTime-previous>TimeSpan.FromMinutes(3)||old.Used-snapshot.Used.Value<5)return null;
+            // Observed recovery only: manual/global resets and account switches
+            // cannot be distinguished from this account-wide snapshot.
+            return "检测到账号额度回升：剩余 "+(100-old.Used).ToString("0.#")+"% → "+(100-snapshot.Used.Value).ToString("0.#")+"%。来自最新账号额度快照，不判断重置原因。";
+        }
+        public void ObserveQuota(Snapshot snapshot,DateTimeOffset now)
+        {
+            var old=Cache.Quota;string message=EvaluateQuota(Cache,snapshot,now);
+            if(!object.ReferenceEquals(old,Cache.Quota))Save();
+            if(message!=null)Notify(message);
+        }
+        void Notify(string message)
+        {
+            File.AppendAllText(Path.Combine(root,"reset-notifications.log"),DateTimeOffset.Now.ToString("o")+" "+message+Environment.NewLine,Encoding.UTF8);
+            if(Notification!=null)Notification(message);
         }
         void Save() { File.WriteAllText(Path.Combine(root,"reset-announcements.json"),new JavaScriptSerializer().Serialize(Cache),Encoding.UTF8); }
         void ChangedNow() { if(!disposed&&Changed!=null)Changed(); }
@@ -235,7 +278,7 @@ namespace CodexUsageTray
             var hero=VisualTheme.Card(this,24,94,592,159,VisualTheme.Night,true);
             phase=VisualTheme.Text(hero,"等待公告",20,17,552,23,9,VisualTheme.Mint);
             time=VisualTheme.Text(hero,"时间待确认",16,45,556,48,28,VisualTheme.WidgetText,true);
-            basis=VisualTheme.Text(hero,"北京时间 · 暂无精确时间",20,107,552,34,9,VisualTheme.WidgetMuted);
+            basis=VisualTheme.Text(hero,MachineTime.Label(DateTimeOffset.UtcNow)+" · 暂无精确时间",20,107,552,34,9,VisualTheme.WidgetMuted);
             var card=VisualTheme.Card(this,24,269,592,173,VisualTheme.Surface);
             VisualTheme.Text(card,"公告依据",18,14,240,23,10,VisualTheme.Ink,true);
             published=VisualTheme.Text(card,"",18,45,556,22,8.5F,VisualTheme.Muted);
@@ -243,7 +286,7 @@ namespace CodexUsageTray
             evidence=VisualTheme.Text(card,"",18,138,556,24,8,VisualTheme.Accent);
             enabled=new SurfaceToggle{Text="预告提醒",Bounds=new Rectangle(26,463,235,26),ForeColor=VisualTheme.Ink};Controls.Add(enabled);
             enabled.CheckedChanged+=delegate{if(!syncing)monitor.Enable(enabled.Checked);};
-            VisualTheme.Text(this,"每小时检查；仅在公告或状态变化时通知。",26,495,410,22,8,VisualTheme.Muted);
+            VisualTheme.Text(this,"公告每30–60秒检查，失败15秒重试；额度回升独立提醒。",26,495,588,22,8,VisualTheme.Muted);
             check=VisualTheme.Button(this,"立即检查",358,459,122,delegate{monitor.Check();});
             source=VisualTheme.Button(this,"查看原帖  ↗",492,459,124,delegate{var n=monitor.Current;if(n!=null&&ResetMonitor.SourceAllowed(n.SourceUrl))Process.Start(new ProcessStartInfo(n.SourceUrl){UseShellExecute=true});},true);
             health=VisualTheme.Text(this,"",26,526,588,23,8,VisualTheme.Muted);
@@ -255,14 +298,14 @@ namespace CodexUsageTray
         {
             if(IsDisposed)return;syncing=true;enabled.Checked=monitor.Cache.Enabled;syncing=false;check.Enabled=!monitor.Busy;
             var n=monitor.Current;source.Enabled=n!=null&&ResetMonitor.SourceAllowed(n.SourceUrl);
-            health.Text=(monitor.Busy?"正在检查":monitor.Cache.Stale?"来源待更新 · 显示上次消息":"来源正常")+"   /   检查："+(monitor.Cache.Checked==DateTimeOffset.MinValue?"尚未检查":ResetMonitor.Beijing(monitor.Cache.Checked))+" "+monitor.Cache.Error;
+            health.Text=(monitor.Busy?"正在检查":monitor.Cache.Stale?"来源待更新 · 显示上次消息":"来源正常")+"   /   检查："+(monitor.Cache.Checked==DateTimeOffset.MinValue?"尚未检查":MachineTime.Describe(monitor.Cache.Checked))+" "+monitor.Cache.Error;
             phase.Text=n==null?"暂无有效公告":(monitor.Cache.Stale?"上次消息 · ":"")+n.StatusText;
             DateTimeOffset estimate;
             bool pending=n!=null&&n.State=="scheduled";
             bool hasTime=pending&&(n.OfficialTime.HasValue||DateTimeOffset.TryParse(n.Estimate,out estimate));
             time.Text=n==null?"等待重置预告":!pending?n.State=="completed"?"已确认完成":n.State=="rolling"?"正在传播":"状态待确认":hasTime?n.ShortTiming:"时间待确认";
-            basis.Text=n==null?"有新公告时将在此显示":!pending?"公告状态不代表每个账户已到账":n.OfficialTime.HasValue?"北京时间 · 高置信预告（原帖明确），执行仍待确认":hasTime?"北京时间 · 社区预计，原帖未给出精确时间":"原帖未给出明确日期、时间和时区";
-            published.Text=n==null?"尚未获取公告":"发布于 "+ResetMonitor.Beijing(n.Published)+"  ·  "+(n.Verified?"原帖已核对":"原帖待核对");
+            basis.Text=n==null?"有新公告时将在此显示":!pending?"公告状态不代表每个账户已到账":n.OfficialTime.HasValue?n.TimeZoneLabel+" · 高置信预告（原帖明确），执行仍待确认":hasTime?n.TimeZoneLabel+" · 社区预计，原帖未给出精确时间":"原帖未给出明确日期、时间和时区";
+            published.Text=n==null?"尚未获取公告":"发布于 "+MachineTime.Describe(n.Published)+"  ·  "+(n.Verified?"原帖已核对":"原帖待核对");
             details.Text=n==null?"暂无可显示的直接重置公告。":n.Text;
             evidence.Text=n==null?"":pending&&!n.OfficialTime.HasValue?"EOD 不换算为精确时间；超过预计时间后继续等待确认。":pending?"高置信描述公告时间的依据，不保证按时完成。":"公共公告已记录；个人到账以账户额度为准。";
         }

@@ -167,7 +167,7 @@ namespace CodexUsageTray
             if (settings.LastAlertAccount != snapshot.Account) { settings.LastLowAlert = ""; settings.LastDailyAlertDay = ""; settings.LastAlertAccount = snapshot.Account; }
             decimal low = snapshot.Currency == "CNY" ? settings.LowBalanceCny : settings.LowBalanceUsd;
             decimal daily = snapshot.Currency == "CNY" ? settings.DailyDecreaseCny : settings.DailyDecreaseUsd;
-            string day = now.ToOffset(TimeSpan.FromHours(8)).ToString("yyyy-MM-dd");
+            string day = MachineTime.Format(now,"yyyy-MM-dd");
             DateTimeOffset last; DateTimeOffset.TryParse(settings.LastLowAlert, out last);
             if (low > 0 && snapshot.Balance.Value <= low && (last == DateTimeOffset.MinValue || (now - last).TotalHours >= 6))
             {
@@ -293,7 +293,7 @@ namespace CodexUsageTray
         public void UpdateAnnouncement(ResetMonitor monitor)
         {
             var n=monitor.Active;
-            announcementLabel.Text=n==null?"暂无有效预告":(monitor.Cache.Stale?"上次预告 · ":n.OfficialTime.HasValue?"预告 · ":"社区预计 · ")+n.ShortTiming+" 北京";
+            announcementLabel.Text=n==null?"暂无有效预告":(monitor.Cache.Stale?"上次预告 · ":n.OfficialTime.HasValue?"预告 · ":"社区预计 · ")+n.ShortTiming+" 本地";
             detailTips.SetToolTip(announcementLabel,monitor.Tooltip);
         }
         public void UpdateSnapshot(Snapshot s, bool alive, bool stopping)
@@ -414,7 +414,7 @@ namespace CodexUsageTray
             menu.Items.Add("停止记录并退出", null, delegate { RequestStop(); ExitThread(); });
             appIcon = MakeIcon(); window.Icon = appIcon;
             tray = new NotifyIcon { Icon = appIcon, ContextMenuStrip = menu, Text = "Codex 用量记录 · 正在读取", Visible = true };
-            resets.Notification+=delegate(string message){tray.ShowBalloonTip(10000,"Codex 全局重置提醒",message,ToolTipIcon.Info);};
+            resets.Notification+=delegate(string message){tray.ShowBalloonTip(10000,"Codex 重置与额度提醒",message,ToolTipIcon.Info);};
             serviceHealth.Notification+=delegate(string message){tray.ShowBalloonTip(10000,"OpenAI 服务状态",message,ToolTipIcon.Info);};
             widget.ContextMenuStrip = menu; widget.Icon = appIcon;
             SyncSettings();
@@ -478,6 +478,7 @@ namespace CodexUsageTray
             try { int.TryParse(File.ReadAllText(Path.Combine(BackendSource.Root, "monitor.pid")).Trim(), out currentPid); } catch { }
             alive = RecorderAlive(currentPid);
             stopping = alive && File.Exists(Path.Combine(BackendSource.Root, "stop.request"));
+            if(alive&&!stopping)resets.ObserveQuota(snapshot,DateTimeOffset.UtcNow);
             if (alive) starting = false;
             if (starting && (DateTime.UtcNow - startAttempt).TotalSeconds > 20)
             {
@@ -502,7 +503,7 @@ namespace CodexUsageTray
             if (notification != null && alive && !stopping) { SaveSettings(); tray.ShowBalloonTip(8000, "DeepSeek 用量提醒", notification, ToolTipIcon.Warning); File.AppendAllText(Path.Combine(root, "notifications.log"), DateTimeOffset.Now.ToString("o") + " " + notification + Environment.NewLine, Encoding.UTF8); }
             SyncSettings();
             window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.UpdateServiceHealth(serviceHealth.Status,serviceHealth.Speed);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
-            string state = new JavaScriptSerializer().Serialize(new { version=Updates.VersionText, openai_status=serviceHealth.Status.State, openai_status_stale=serviceHealth.Status.Stale, openai_checked_at=serviceHealth.Status.Checked.ToString("o"), output_effective_tps=serviceHealth.Speed.Effective, output_tps_stale=serviceHealth.Speed.Stale, output_tps_samples=serviceHealth.Speed.Samples, output_tps_window_seconds=1800, output_tps_method="output per second of the measured generation window; includes reasoning; excludes pre-first-item waiting and explicit tool execution", widget_status_line=widget.StatusLine, widget_speed_line=widget.SpeedLine, pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
+            string state = new JavaScriptSerializer().Serialize(new { version=Updates.VersionText, reset_checked_at=resets.Cache.CheckedAt, reset_next_check_at=resets.NextCheck.ToString("o"), reset_source_stale=resets.Cache.Stale, machine_time_zone=TimeZoneInfo.Local.Id, machine_time_label=MachineTime.Label(DateTimeOffset.UtcNow), reset_quota_observed_at=resets.Cache.Quota==null?null:resets.Cache.Quota.SampleAt, openai_status=serviceHealth.Status.State, openai_status_stale=serviceHealth.Status.Stale, openai_checked_at=serviceHealth.Status.Checked.ToString("o"), output_effective_tps=serviceHealth.Speed.Effective, output_tps_stale=serviceHealth.Speed.Stale, output_tps_samples=serviceHealth.Speed.Samples, output_tps_window_seconds=1800, output_tps_method="output per second of the measured generation window; includes reasoning; excludes pre-first-item waiting and explicit tool execution", widget_status_line=widget.StatusLine, widget_speed_line=widget.SpeedLine, pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
             if (state != publishedStatus)
             {
                 try { File.WriteAllText(Path.Combine(root, "tray-status.json"), state, Encoding.UTF8); publishedStatus = state; } catch { }
@@ -765,7 +766,7 @@ namespace CodexUsageTray
                     foreach(var size in new[]{new Size(144,88),new Size(160,92),new Size(249,175),new Size(250,176),new Size(220,240),new Size(360,220),new Size(560,360)})
                     foreach(string state in new[]{"fresh","stale","paused","unknown","official","deadline","estimate","old-deadline"})
                     {
-                        var example=new Snapshot{Remaining=100,PrimaryReset=DateTimeOffset.Now.AddDays(365).ToOffset(TimeSpan.FromHours(8)),A=long.MaxValue,Stale=false,QuotaStale=state=="stale"};
+                        var example=new Snapshot{Remaining=100,PrimaryReset=DateTimeOffset.Now.AddDays(365),A=long.MaxValue,Stale=false,QuotaStale=state=="stale"};
                         if(state=="unknown")example.Remaining=null;
                         floating.ApplyLogicalSize(size);floating.UpdateSnapshot(example,state!="paused",false);
                         floating.UpdateServiceHealth(new OfficialStatus{State=state=="unknown"?"unknown":state=="fresh"?"operational":"degraded_performance",Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""},new SpeedStatus{Effective=state=="unknown"?(double?)null:state=="fresh"?5.1:123456.7,Samples=14,Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""});
@@ -788,7 +789,7 @@ namespace CodexUsageTray
                 using(var health=new ServiceHealth(root,root))
                 {
                     health.Status=new OfficialStatus{State="degraded_performance",Checked=DateTimeOffset.UtcNow,Description="Degraded performance in Codex and ChatGPT Work",Incident="Degraded performance in Codex and ChatGPT Work"};
-                    health.Speed=new SpeedStatus{Effective=5.1,Samples=14,Recorded=14,Matched=14,Checked=DateTimeOffset.UtcNow,LastResponse=DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(8)).ToString("o"),Models="gpt-6.1-sol · 5.1 t/s"};
+                    health.Speed=new SpeedStatus{Effective=5.1,Samples=14,Recorded=14,Matched=14,Checked=DateTimeOffset.UtcNow,LastResponse=DateTimeOffset.UtcNow.ToString("o"),Models="gpt-6.1-sol · 5.1 t/s"};
                     using(var form=new ServiceHealthForm(health)){CreateHandles(form);form.PerformLayout();if(preview!=null)PreviewHost.Render(form,Path.Combine(Path.GetDirectoryName(preview),"openai-status-preview.png"));}
                 }
                 checks.Add("PASS: scoped service health and speed details render without focus or network requests");
