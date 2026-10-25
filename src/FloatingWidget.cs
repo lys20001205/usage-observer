@@ -9,10 +9,12 @@ namespace CodexUsageTray
 {
     internal sealed class FloatingWidget : Form
     {
-        internal const int MinimumWidth=144,MinimumHeight=88,MaximumWidth=560,MaximumHeight=360;
+        internal const int MinimumWidth=144,MinimumHeight=122,MaximumWidth=560,MaximumHeight=360;
         internal const int EdgeLeft=1,EdgeRight=2,EdgeTop=4,EdgeBottom=8;
         Snapshot snapshot=new Snapshot();DeepSeekSnapshot deepseek=new DeepSeekSnapshot();
         OfficialStatus officialStatus=new OfficialStatus();SpeedStatus speedStatus=new SpeedStatus();
+        CreditsSnapshot credits=new CreditsSnapshot();
+        internal string CreditsLine {get{return credits.Compact;}}
         internal string StatusLine {get{return officialStatus.Compact;}}
         internal string SpeedLine {get{return speedStatus.Compact;}}
         ResetNotice announcement;bool announcementStale,alive,stopping,dragging,resizing,moved,pending,syncingGlass;
@@ -48,7 +50,7 @@ namespace CodexUsageTray
             open=show;savePosition=save;saveSize=sizeChanged;
             Text="Codex 桌面浮标";FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;
             StartPosition=FormStartPosition.Manual;AutoScaleMode=AutoScaleMode.None;BackColor=VisualTheme.Night;
-            ClientSize=new Size((int)Math.Round(160*InitialScale),(int)Math.Round(92*InitialScale));
+            ClientSize=new Size((int)Math.Round(160*InitialScale),(int)Math.Round(126*InitialScale));
             SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);
             VisualTheme.Track(this);VisualTheme.ThemeChanged+=OnThemeChanged;
             renderTimer.Tick+=delegate{if(pending||(!glass.Ready&&Visible&&frost.Due)){pending=false;Present();}};renderTimer.Start();
@@ -148,10 +150,11 @@ namespace CodexUsageTray
         public void UpdateSnapshot(Snapshot s,bool running,bool paused)
         {
             snapshot=s;alive=running;stopping=paused;
-            tooltip.SetToolTip(this,s.Tooltip(running,paused)+"\n"+officialStatus.Compact+" · "+officialStatus.Description+"\n"+speedStatus.Detail+"\n"+s.ResetTooltip+"\n"+resetNotice+"\n"+deepseek.ShortText+"\n今日本机 DSH token："+Snapshot.Compact(deepseek.A)+"\n右键查看 OpenAI 状态与速度 · 拖中间移动 · 拖边缘/右下角缩放");pending=true;
+            tooltip.SetToolTip(this,s.Tooltip(running,paused)+"\n"+credits.Detail+"\n"+officialStatus.Compact+" · "+officialStatus.Description+"\n"+speedStatus.Detail+"\n"+s.ResetTooltip+"\n"+resetNotice+"\n"+deepseek.ShortText+"\n今日本机 DSH token："+Snapshot.Compact(deepseek.A)+"\n右键查看 Credits 变化 · 拖中间移动 · 拖边缘/右下角缩放");pending=true;
         }
         public void UpdateServiceHealth(OfficialStatus status,SpeedStatus speed){officialStatus=status;speedStatus=speed;pending=true;}
         public void UpdateDeepSeek(DeepSeekSnapshot value){deepseek=value;pending=true;}
+        public void UpdateCredits(CreditsSnapshot value){credits=value;pending=true;}
         public void UpdateResetNotice(ResetMonitor monitor){resetNotice=monitor.Tooltip;announcement=monitor.Active;announcementStale=monitor.Cache.Stale;pending=true;}
         public void EnsurePresentation(bool desired){string reason=WindowRecovery.Ensure(this,desired,dragging||resizing,ref lastRaise);if(reason.Length>0&&reason!="cloaked")BackgroundLifetime.Log("widget_recovered reason="+reason);SyncGlass();}
         internal string TimingSummary
@@ -192,7 +195,7 @@ namespace CodexUsageTray
         protected override void OnPaint(PaintEventArgs e){PaintContent(e.Graphics);}
         internal void PaintContent(Graphics g)
         {
-            float scale=RenderScale,w=Width/scale,h=Height/scale,p=12;
+            float scale=RenderScale,w=Width/scale,fullHeight=Height/scale,h=fullHeight-34,p=12;
             TextFits=true;SmallestTextSize=float.MaxValue;RenderedLines.Clear();
             g.Clear(Color.Transparent);g.SmoothingMode=SmoothingMode.AntiAlias;g.PixelOffsetMode=PixelOffsetMode.HighQuality;
             g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
@@ -256,6 +259,8 @@ namespace CodexUsageTray
             TextLine(g,StatusLine,10,officialStatus.Unhealthy?VisualTheme.Warning:muted,p,telemetryY,statusWidth,16,false,false);
             TextLine(g,SpeedLine,10,speedStatus.Stale?muted:VisualTheme.Mint,p+statusWidth,telemetryY,contentW-statusWidth,16,true,false);
             TextLine(g,TimingSummary,11,announcement!=null&&!announcementStale?VisualTheme.Mint:muted,p,h-20,contentW,16,false,false);
+            TextLine(g,CreditsLine,11,credits.Stale?muted:VisualTheme.Mint,p,fullHeight-37,contentW,17,false,false);
+            TextLine(g,credits.Change,10,credits.Stale?muted:VisualTheme.WidgetText,p,fullHeight-20,contentW,16,false,false);
         }
         void TextLine(Graphics g,string text,float size,Color color,float x,float y,float width,float height,bool right,bool numeric)
         {

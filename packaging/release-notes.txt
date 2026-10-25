@@ -1,3 +1,10 @@
+## Credits balance and observed changes
+
+- Show Credits balance and today's observed decrease in the floating widget. Hover or use the context menu for the latest delta and collection coverage.
+- Read existing quota samples without extra account or model requests. Preserve exact decimals and UTC timestamps in credits-history.csv.
+- Exclude failed samples, gaps over three minutes, identified account changes and midnight-crossing intervals from daily decrease totals. Retain stale values on failures; never turn missing data into zero. Legacy samples cannot identify login switches.
+- Add two dedicated widget rows and increase minimum height by 34 logical pixels. Preserve width, location, theme, settings and recording processes.
+
 ## Automatic machine time zones
 
 - Convert forecasts, reset displays, status checks and response details using the running machine's Windows time zone and the event date's daylight-saving rule. Refresh zone information after a Windows time-zone change.

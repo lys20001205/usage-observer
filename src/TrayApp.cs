@@ -113,7 +113,7 @@ namespace CodexUsageTray
     internal sealed class WidgetSettings
     {
         public int X = int.MinValue, Y = int.MinValue;
-        public int WidgetWidth=160, WidgetHeight=92, WidgetTransparency=60;
+        public int WidgetWidth=160, WidgetHeight=126, WidgetTransparency=60;
         public bool Visible = true;
         public bool RecorderPaused = false;
         public bool DeepSeekAlerts = true;
@@ -352,6 +352,7 @@ namespace CodexUsageTray
         Snapshot snapshot = new Snapshot();
         DeepSeekSnapshot deepseekSnapshot = new DeepSeekSnapshot();
         readonly ServiceHealth serviceHealth;
+        readonly CreditsMonitor credits;
         ServiceHealthForm serviceHealthWindow;
         string thresholdCurrency = "";
         bool alive, stopping, starting;
@@ -366,6 +367,7 @@ namespace CodexUsageTray
             File.Delete(Path.Combine(root, "ui-exit.request"));
             settings = WidgetSettings.Load(root); startup = new StartupSetting(Application.ExecutablePath);
             serviceHealth=new ServiceHealth(root,BackendSource.Root);
+            credits=new CreditsMonitor(root,BackendSource.Root);
             window = new Dashboard(Toggle, ShowDetailsWindow, delegate { OpenFile(""); });
             widget = new FloatingWidget(ShowWindow, delegate(Point point) { settings.X = point.X; settings.Y = point.Y; SaveSettings(); }, delegate(Size size) {settings.WidgetWidth=size.Width;settings.WidgetHeight=size.Height;SaveSettings();}); widget.Place(settings);
             resets=new ResetMonitor(root);
@@ -384,6 +386,8 @@ namespace CodexUsageTray
             menu.Items.Add("设备与账号 / GitHub 同步", null, delegate { new NetworkForm(root).Show(); });
             menu.Items.Add("检查程序更新", null, delegate { new UpdateForm(root).Show(); });
             menu.Items.Add("OpenAI 状态与输出速度",null,delegate{if(serviceHealthWindow==null||serviceHealthWindow.IsDisposed)serviceHealthWindow=new ServiceHealthForm(serviceHealth);serviceHealthWindow.Show(window.Visible?window:null);});
+            menu.Items.Add("Credits 余额与变化",null,delegate{MessageBox.Show(credits.Snapshot.Detail,"Credits 余额与变化",MessageBoxButtons.OK,MessageBoxIcon.Information);});
+            menu.Items.Add("打开 Credits 变化记录",null,delegate{try{Process.Start(new ProcessStartInfo(Path.Combine(root,"credits-history.csv")){UseShellExecute=true});}catch(Exception e){Error(e.Message);}});
             var statusAlerts=new ToolStripMenuItem("OpenAI 状态变化提醒"){CheckOnClick=true,Checked=serviceHealth.Alerts};statusAlerts.CheckedChanged+=delegate{serviceHealth.Alerts=statusAlerts.Checked;serviceHealth.Save();};menu.Items.Add(statusAlerts);
             window.UpdateProgram.Click += delegate { new UpdateForm(root).Show(); };
             toggle = new ToolStripMenuItem("暂停记录", null, delegate { Toggle(); }); menu.Items.Add(toggle);
@@ -478,6 +482,7 @@ namespace CodexUsageTray
             try { int.TryParse(File.ReadAllText(Path.Combine(BackendSource.Root, "monitor.pid")).Trim(), out currentPid); } catch { }
             alive = RecorderAlive(currentPid);
             stopping = alive && File.Exists(Path.Combine(BackendSource.Root, "stop.request"));
+            credits.Tick(alive&&!stopping&&!settings.RecorderPaused);widget.UpdateCredits(credits.Snapshot);
             if(alive&&!stopping)resets.ObserveQuota(snapshot,DateTimeOffset.UtcNow);
             if (alive) starting = false;
             if (starting && (DateTime.UtcNow - startAttempt).TotalSeconds > 20)
@@ -503,7 +508,7 @@ namespace CodexUsageTray
             if (notification != null && alive && !stopping) { SaveSettings(); tray.ShowBalloonTip(8000, "DeepSeek 用量提醒", notification, ToolTipIcon.Warning); File.AppendAllText(Path.Combine(root, "notifications.log"), DateTimeOffset.Now.ToString("o") + " " + notification + Environment.NewLine, Encoding.UTF8); }
             SyncSettings();
             window.UpdateAnnouncement(resets);widget.UpdateResetNotice(resets);widget.UpdateServiceHealth(serviceHealth.Status,serviceHealth.Speed);widget.EnsurePresentation(settings.Visible); widget.UpdateSnapshot(snapshot, alive, stopping);
-            string state = new JavaScriptSerializer().Serialize(new { version=Updates.VersionText, reset_checked_at=resets.Cache.CheckedAt, reset_next_check_at=resets.NextCheck.ToString("o"), reset_source_stale=resets.Cache.Stale, machine_time_zone=TimeZoneInfo.Local.Id, machine_time_label=MachineTime.Label(DateTimeOffset.UtcNow), reset_quota_observed_at=resets.Cache.Quota==null?null:resets.Cache.Quota.SampleAt, openai_status=serviceHealth.Status.State, openai_status_stale=serviceHealth.Status.Stale, openai_checked_at=serviceHealth.Status.Checked.ToString("o"), output_effective_tps=serviceHealth.Speed.Effective, output_tps_stale=serviceHealth.Speed.Stale, output_tps_samples=serviceHealth.Speed.Samples, output_tps_window_seconds=1800, output_tps_method="output per second of the measured generation window; includes reasoning; excludes pre-first-item waiting and explicit tool execution", widget_status_line=widget.StatusLine, widget_speed_line=widget.SpeedLine, pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
+            string state = new JavaScriptSerializer().Serialize(new { credits_balance=credits.Snapshot.Balance, credits_stale=credits.Snapshot.Stale, credits_today_decrease=credits.Snapshot.TodayDecrease, credits_last_delta=credits.Snapshot.Delta, widget_credits_line=widget.CreditsLine, version=Updates.VersionText, reset_checked_at=resets.Cache.CheckedAt, reset_next_check_at=resets.NextCheck.ToString("o"), reset_source_stale=resets.Cache.Stale, machine_time_zone=TimeZoneInfo.Local.Id, machine_time_label=MachineTime.Label(DateTimeOffset.UtcNow), reset_quota_observed_at=resets.Cache.Quota==null?null:resets.Cache.Quota.SampleAt, openai_status=serviceHealth.Status.State, openai_status_stale=serviceHealth.Status.Stale, openai_checked_at=serviceHealth.Status.Checked.ToString("o"), output_effective_tps=serviceHealth.Speed.Effective, output_tps_stale=serviceHealth.Speed.Stale, output_tps_samples=serviceHealth.Speed.Samples, output_tps_window_seconds=1800, output_tps_method="output per second of the measured generation window; includes reasoning; excludes pre-first-item waiting and explicit tool execution", widget_status_line=widget.StatusLine, widget_speed_line=widget.SpeedLine, pid = Process.GetCurrentProcess().Id, tray_initialized = tray.Visible, widget_visible = widget.Visible, widget_native_visible = WindowRecovery.IsWindowVisible(widget.Handle), widget_minimized = WindowRecovery.IsIconic(widget.Handle), widget_topmost = WindowRecovery.Topmost(widget.Handle), widget_cloaked = WindowRecovery.Cloaked(widget.Handle), ui_heartbeat_at = DateTimeOffset.UtcNow.ToString("o"), theme_id=VisualTheme.CurrentTheme.Preset,backend_mode = BackendSource.Legacy?"legacy_ab":"local", widget_x = widget.Left, widget_y = widget.Top, widget_width=widget.Width,widget_height=widget.Height,widget_logical_width=widget.LogicalSize.Width,widget_logical_height=widget.LogicalSize.Height,widget_layout=widget.LayoutMode,widget_dpi_scale=widget.RenderScale,widget_frosted=widget.FrostedReady,widget_material_mode=widget.FrostedMode,widget_material_hresult=widget.MaterialResult, startup_enabled = startup.Enabled, recorder_pid = currentPid, recorder_alive = alive, state = starting ? "正在启动" : snapshot.State(alive, stopping), tooltip = tray.Text, last_sample_at = snapshot.Last.ToString("o") });
             if (state != publishedStatus)
             {
                 try { File.WriteAllText(Path.Combine(root, "tray-status.json"), state, Encoding.UTF8); publishedStatus = state; } catch { }
@@ -528,6 +533,7 @@ namespace CodexUsageTray
             settings.X = widget.Left; settings.Y = widget.Top;settings.WidgetWidth=widget.LogicalSize.Width;settings.WidgetHeight=widget.LogicalSize.Height;SaveSettings();
             timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); widget.Dispose(); window.Dispose(); appIcon.Dispose();
             serviceHealth.Dispose();if(serviceHealthWindow!=null&&!serviceHealthWindow.IsDisposed)serviceHealthWindow.Dispose();
+            credits.Dispose();
             resets.Dispose();if(resetWindow!=null&&!resetWindow.IsDisposed)resetWindow.Dispose();
             if(themeWindow!=null&&!themeWindow.IsDisposed)themeWindow.Dispose();
             if(detailsWindow!=null&&!detailsWindow.IsDisposed)detailsWindow.Dispose();
@@ -606,6 +612,7 @@ namespace CodexUsageTray
             try
             {
                 Updates.SelfTest(); checks.Add("PASS: GitHub repository/release parsing, stable version, HTTPS origin, digest/size verification and corrupt-download rejection");
+                var creditFixture=CreditsSnapshot.Parse("{\"balance\":\"55635.123456\",\"last_delta\":\"-32.125\",\"today_decrease\":\"75.5\",\"sampled_at\":\""+DateTimeOffset.UtcNow.ToString("o")+"\",\"stale\":false}");Require(creditFixture.Balance==55635.123456m&&creditFixture.Delta==-32.125m&&!creditFixture.Stale,"Credits precision and negative delta parsing");Require(CreditsSnapshot.Parse("{}").Stale,"missing Credits stays unknown");
                 ServiceHealth.SelfTest();checks.Add("PASS: official service scope, degradation/recovery/deduplication, unknown/stale failures and effective TPS formatting");
                 string json = "{\"running\":true,\"pid\":123,\"remaining_percent\":74,\"used_percent\":26,\"recorded_tokens\":{\"A\":1290023,\"B\":987654},\"last_sample_at\":\"2026-10-09T07:55:31Z\",\"recording_started_at\":\"2026-10-09T07:47:41Z\",\"interval_seconds\":60,\"health\":{\"A\":{\"status\":\"ok\"},\"B\":{\"status\":\"ok\"},\"classification\":\"基线或额度未上升\"}}";
                 json = json.Insert(1, "\"primary_resets_at\":1792137600,\"primary_window_minutes\":10080,\"secondary_resets_at\":1791658800,\"secondary_window_minutes\":300,");
@@ -642,11 +649,11 @@ namespace CodexUsageTray
                 Require(FloatingWidget.HitEdges(new Point(80,46),new Size(160,92),6)==0,"center remains movable/clickable");
                 var original=new Rectangle(100,100,200,120);var screenArea=new Rectangle(0,0,1920,1040);
                 var shrunk=FloatingWidget.ResizeBounds(original,new Point(300,300),FloatingWidget.EdgeLeft|FloatingWidget.EdgeTop,screenArea,1);
-                Require(shrunk.Right==original.Right&&shrunk.Bottom==original.Bottom&&shrunk.Size==new Size(144,88),"corner resize anchors opposite corner and enforces readable minimum");
+                Require(shrunk.Right==original.Right&&shrunk.Bottom==original.Bottom&&shrunk.Size==new Size(144,122),"corner resize anchors opposite corner and enforces readable minimum");
                 var grown=FloatingWidget.ResizeBounds(original,new Point(10000,10000),FloatingWidget.EdgeRight|FloatingWidget.EdgeBottom,screenArea,1);
                 Require(grown.Size==new Size(560,360)&&screenArea.Contains(grown),"resize enforces maximum and screen bounds");
-                var negative=FloatingWidget.ResizeBounds(new Rectangle(-1900,10,180,100),new Point(-200,-200),FloatingWidget.EdgeLeft|FloatingWidget.EdgeTop,new Rectangle(-1920,0,1920,1040),1.5F);
-                Require(negative.Left>=-1920&&negative.Top>=0&&negative.Right==-1720&&negative.Bottom==110,"negative monitor resize preserves anchors at high DPI");
+                var negative=FloatingWidget.ResizeBounds(new Rectangle(-1900,10,180,200),new Point(-200,-200),FloatingWidget.EdgeLeft|FloatingWidget.EdgeTop,new Rectangle(-1920,0,1920,1040),1.5F);
+                Require(negative.Left>=-1920&&negative.Top>=0&&negative.Right==-1720&&negative.Bottom==210,"negative monitor resize preserves anchors at high DPI");
                 Require(FloatingWidget.Mode(new Size(160,92))=="compact"&&FloatingWidget.Mode(new Size(320,110))=="wide"&&FloatingWidget.Mode(new Size(220,240))=="expanded","content adapts to aspect ratio");
                 checks.Add("PASS: resize grip vs move/click, anchored minimum/maximum bounds, negative monitor/high-DPI geometry and three responsive modes");
                 string testDir = Path.Combine(Path.GetTempPath(), "usage-widget-test-" + Guid.NewGuid().ToString("N"));
@@ -655,7 +662,7 @@ namespace CodexUsageTray
                 {
                     var pref = new WidgetSettings { X = -1600, Y = 400, Visible = false, RecorderPaused = true,WidgetWidth=321,WidgetHeight=220 }; pref.Save(testDir); var restored = WidgetSettings.Load(testDir);
                     Require(restored.X == -1600 && restored.Y == 400 && !restored.Visible && restored.RecorderPaused&&restored.WidgetWidth==321&&restored.WidgetHeight==220, "widget settings persist");
-                    File.WriteAllText(Path.Combine(testDir,"ui-settings.json"),"{\"X\":20,\"RecorderPaused\":true}");var legacy=WidgetSettings.Load(testDir);Require(legacy.WidgetWidth==160&&legacy.WidgetHeight==92&&legacy.RecorderPaused,"legacy preferences migrate with default size");
+                    File.WriteAllText(Path.Combine(testDir,"ui-settings.json"),"{\"X\":20,\"RecorderPaused\":true}");var legacy=WidgetSettings.Load(testDir);Require(legacy.WidgetWidth==160&&legacy.WidgetHeight==126&&legacy.RecorderPaused,"legacy preferences migrate with default size");
                     checks.Add("PASS: widget position/visibility/size persist and legacy settings gain safe defaults");
                 }
                 finally { File.Delete(Path.Combine(testDir, "ui-settings.json")); Directory.Delete(testDir); }
@@ -680,7 +687,7 @@ namespace CodexUsageTray
                     floating.UpdateDeepSeek(ds); floating.UpdateSnapshot(s, s.Running, false); CreateHandles(floating);
                     floating.UpdateServiceHealth(new OfficialStatus{State="degraded_performance",Checked=DateTimeOffset.UtcNow,Description="Codex / ChatGPT Work performance degradation"},new SpeedStatus{Effective=5.1,Samples=14,Recorded=14,Matched=14,Checked=DateTimeOffset.UtcNow});
                     if (preview != null) using (var bmp = new Bitmap(floating.Width, floating.Height)) { floating.DrawToBitmap(bmp, new Rectangle(0, 0, floating.Width, floating.Height)); bmp.Save(Path.Combine(Path.GetDirectoryName(preview), "widget-preview.png"), System.Drawing.Imaging.ImageFormat.Png); }
-                    Require(floating.TopMost && !floating.ShowInTaskbar && floating.LogicalSize == new Size(160,92), "compact widget window style");
+                    Require(floating.TopMost && !floating.ShowInTaskbar && floating.LogicalSize == new Size(160,126), "compact widget window style");
                     Require(floating.Opacity == 1.0 && floating.FramePolicyResult == 0 && floating.BorderPolicyResult == 0, "text opacity and native frame suppression");
                     if(Environment.OSVersion.Version.Build>=22621)Require((floating.FrostedReady&&floating.MaterialResult==0)||(!floating.FrostedReady&&floating.LayeredRenderSucceeded),"native blur or working alpha fallback");
                     if(Environment.OSVersion.Version.Build>=15063)Require(floating.PerMonitorAware,"manifest requests per-monitor V2 DPI rendering");
@@ -771,18 +778,21 @@ namespace CodexUsageTray
                         floating.ApplyLogicalSize(size);floating.UpdateSnapshot(example,state!="paused",false);
                         floating.UpdateServiceHealth(new OfficialStatus{State=state=="unknown"?"unknown":state=="fresh"?"operational":"degraded_performance",Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""},new SpeedStatus{Effective=state=="unknown"?(double?)null:state=="fresh"?5.1:123456.7,Samples=14,Checked=DateTimeOffset.UtcNow,Error=state=="stale"?"timeout":""});
                         floating.UpdateDeepSeek(new DeepSeekSnapshot{Balance=123456.78m,A=long.MaxValue,Stale=state=="stale"});
+                        floating.UpdateCredits(new CreditsSnapshot{Balance=55635.88m,TodayDecrease=1234.56m,Delta=-32.1m,Sampled=DateTimeOffset.UtcNow,Failed=state=="stale"});
                         monitor.Cache.Stale=state=="old-deadline";monitor.Cache.Scheduled=null;
                         if(state=="official"||state=="deadline"||state=="estimate"||state=="old-deadline")
                             monitor.Cache.Scheduled=new ResetNotice{Id="fit-only",State="scheduled",Text=state=="estimate"?"Reset expected around EOD":"Reset "+(state.Contains("deadline")?"by":"at")+" 2026-12-31 15:59 UTC",SourceUrl="https://x.com/thsottiaux/status/123456789",Published=DateTimeOffset.UtcNow,Verified=true,Estimate="2026-12-31T15:59:00Z"};
                         floating.UpdateResetNotice(monitor);
-                        using(var bmp=new Bitmap(floating.Width,floating.Height))using(var g=Graphics.FromImage(bmp))floating.PaintContent(g);
+                        using(var bmp=new Bitmap(floating.Width,floating.Height))
+                        {using(var g=Graphics.FromImage(bmp))floating.PaintContent(g);if(preview!=null&&size==new Size(144,88)&&state=="fresh")bmp.Save(Path.Combine(Path.GetDirectoryName(preview),"credits-widget.png"));}
                         Require(floating.TextFits&&floating.SmallestTextSize>=9,"complete readable text fits "+size+" "+state+"; min="+floating.SmallestTextSize);
                         if(state=="official")Require(floating.TimingSummary.StartsWith("预告 "),"official timing remains a forecast");
                         if(state.Contains("deadline"))Require(floating.TimingSummary.Contains("最晚"),"deadline keeps by semantics");
                         if(state=="estimate")Require(floating.TimingSummary.StartsWith("预计 "),"community estimate is distinct");
                         if(state=="old-deadline")Require(floating.TimingSummary.StartsWith("旧预"),"stale forecast remains marked");
                         Require(floating.RenderedLines.Contains(floating.StatusLine)&&floating.RenderedLines.Contains(floating.SpeedLine),"service status and TPS visible in every widget size");
-                        Require(floating.RenderedLines.Count<=(size.Height>=212&&size.Width>=250?11:size.Height>=240?9:7),"compact information without repeated timestamps "+size+" count="+floating.RenderedLines.Count);
+                        Require(floating.RenderedLines.Contains(floating.CreditsLine),"Credits visible in every widget size");
+                        Require(floating.RenderedLines.Count<=2+(size.Height>=212&&size.Width>=250?11:size.Height>=240?9:7),"compact information without repeated timestamps "+size+" count="+floating.RenderedLines.Count);
                     }
                 }
                 checks.Add("PASS: complete text fits seven sizes and eight states without ellipses; large balances, long dates, forecast/deadline/estimate and stale meanings retained");

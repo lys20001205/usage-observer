@@ -25,7 +25,9 @@ jobs:
         shell: pwsh
         run: |
           ./packaging/build-release.ps1 -OutputDirectory "$env:RUNNER_TEMP/release" -NetworkingPython (Get-Command python).Source
-          $evidence=Get-Content ./work/release-1.0.4.16/build-evidence.json -Raw | ConvertFrom-Json
+          $metadata=Get-Content "$env:RUNNER_TEMP/release/release-metadata.json" -Raw | ConvertFrom-Json
+          $version=$metadata.tag_name.TrimStart('v')
+          $evidence=Get-Content "./work/release-$version/build-evidence.json" -Raw | ConvertFrom-Json
           ./tests/test-reset.ps1 -OutputDirectory "$env:RUNNER_TEMP/reset-tests"
           & (Join-Path $evidence.stage 'app/runtime/python/python.exe') -m unittest discover -s tests -v
           if($LASTEXITCODE -ne 0){throw 'Bundled runtime checks failed'}
