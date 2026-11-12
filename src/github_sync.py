@@ -1,6 +1,7 @@
 """Opt-in private GitHub usage summaries. Recorder databases stay read-only."""
 import argparse, base64, collections, ctypes, datetime as dt, hashlib, json, os
 import pathlib, re, shutil, sqlite3, subprocess, sys, time, urllib.error, urllib.parse, urllib.request, uuid
+import api_usage
 
 FIELDS=('input_tokens','cached_input_tokens','output_tokens','reasoning_output_tokens','total_tokens')
 REPOSITORY=re.compile(r'^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$')
@@ -108,6 +109,11 @@ def unprotect(data):
     finally: ctypes.windll.kernel32.LocalFree(target.data)
 def credential(data,settings):
     if settings.get('use_git_login'):
+        gh=shutil.which('gh')
+        if gh:
+            env=dict(os.environ,GH_PROMPT_DISABLED='1')
+            p=subprocess.run([gh,'auth','token','--hostname','github.com'],capture_output=True,text=True,encoding='utf-8',errors='replace',env=env,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+            if p.returncode==0 and p.stdout.strip():return p.stdout.strip()
         exe=shutil.which('git')
         if not exe: raise SyncError('git_login_unavailable')
         env=dict(os.environ,GCM_INTERACTIVE='never',GCM_GUI_PROMPT='false',GIT_TERMINAL_PROMPT='0')
@@ -176,6 +182,11 @@ def validate_latest(value,device,at=None):
     for day in value['daily']:
         if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',day.get('day','')): raise SyncError('invalid_remote_day')
         usage(day.get('tokens') or {})
+    if value.get('api_usage') is not None:
+        try:
+            api_usage.validate_report(value['api_usage'],(at or dt.datetime.now(UTC)).timestamp())
+            if value['api_usage'].get('device_id')!=device:raise ValueError('api_device_mismatch')
+        except (ValueError,KeyError,TypeError):raise SyncError('invalid_api_summary') from None
     value['label']=clean_label(value.get('label','Device')); return value
 
 def sync_once(data,api=None,at=None):
@@ -185,8 +196,13 @@ def sync_once(data,api=None,at=None):
     repo=api.check_private(); device=identity(data); state=read(data/'github-sync-state.json')
     if state.get('repository')!=api.repository: state={'repository':api.repository,'hashes':{}}
     hashes=state.setdefault('hashes',{}); writes=0; pending=0
+    local_api=read(data/'api-usage-status.json')
+    try:api_usage.validate_report(local_api,at.timestamp())
+    except (ValueError,KeyError,TypeError):local_api=None
     if settings.get('upload_local',True):
         docs,latest=export_records(backend_root(data)/'records.sqlite',device,settings.get('label','Device'),at)
+        if local_api and local_api.get('device_id')==device:
+            latest['api_usage']=local_api
         latest['recording_running']=bool(read(backend_root(data)/'status.json').get('running'))
         for day,doc in sorted(docs.items(),reverse=True):
             path='devices/'+device+'/days/'+day+'.json'; digest=hashlib.sha256(encoded(doc)).hexdigest()
@@ -212,8 +228,22 @@ def sync_once(data,api=None,at=None):
         except (SyncError,KeyError,TypeError): rejected+=1
     remote={'schema':1,'repository':api.repository,'updated_at':at.isoformat(),'devices':peers,'rejected':rejected}
     save(data/'github-sync-devices.json',remote)
+    windows=[]
+    for peer in peers:
+        for period in (peer.get('api_usage') or {}).get('periods',[]):
+            windows.append({k:period.get(k) for k in ('start','scheduled_reset','account_tag','first85','percent','quota_at')})
+    if local_api:
+        for period in local_api['periods']:
+            windows.append({k:period.get(k) for k in ('start','scheduled_reset','account_tag','first85','percent','quota_at')})
+    shared=api_usage.merge_windows(windows,at.timestamp())
+    old_shared=read(data/'api-shared-windows.json').get('windows')
+    if shared!=old_shared:
+        save(data/'api-shared-windows.json',{'schema':1,'windows':shared})
+        (data/'api-usage.request').write_text(now(),encoding='utf-8')
+    if local_api:api_usage.combined(data,local_api,at.timestamp())
     return {'state':'ok','updated_at':at.isoformat(),'repository':api.repository,'private_verified':True,
             'devices':len(peers),'writes':writes,'pending_days':pending,'rejected':rejected,
+            'api_devices':sum(bool(p.get('api_usage')) for p in peers),
             'mode':'upload_and_read' if settings.get('upload_local',True) else 'read_only'}
 
 def main():

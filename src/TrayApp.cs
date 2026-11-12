@@ -230,7 +230,8 @@ namespace CodexUsageTray
             reset=AddTo(hero,"重置时间待获取",296,43,252,40,9,VisualTheme.WidgetText);
             announcementLabel=AddTo(hero,"全局预告 · 等待检查",296,87,252,36,8.5F,VisualTheme.Mint);
             ResetAnnouncements=VisualTheme.Button(hero,"重置预告  ↗",294,122,258,delegate{});
-            AddTo(this,"记录概览",26,281,320,23,10,VisualTheme.Ink,true);
+            AddTo(this,"记录概览",26,281,246,23,10,VisualTheme.Ink,true);
+            AddButton("API金额与三机 ↗",292,274,154,delegate{new ApiUsageForm(Paths.Data).Show();});
             AddButton("设备与账号  ↗",454,274,142,delegate{new NetworkForm(Paths.Data).Show();});
             Panel a=Card(24,322),b=Card(318,322);
             AddTo(a,"本机 Codex · 累计 token",18,13,242,20,8.5F,VisualTheme.Muted);
@@ -364,6 +365,7 @@ namespace CodexUsageTray
         public TrayContext(string directory)
         {
             root = directory;
+            ApiUsageRuntime.Ensure(root);
             File.Delete(Path.Combine(root, "ui-exit.request"));
             settings = WidgetSettings.Load(root); startup = new StartupSetting(Application.ExecutablePath);
             serviceHealth=new ServiceHealth(root,BackendSource.Root);
@@ -384,6 +386,7 @@ namespace CodexUsageTray
             menu.Items.Add("全局重置预告与提醒", null, delegate { ShowResetWindow(); });
             window.ResetAnnouncements.Click+=delegate {ShowResetWindow();};
             menu.Items.Add("设备与账号 / GitHub 同步", null, delegate { new NetworkForm(root).Show(); });
+            menu.Items.Add("API金额与三机分摊", null, delegate { new ApiUsageForm(root).Show(window.Visible?window:null); });
             menu.Items.Add("检查程序更新", null, delegate { new UpdateForm(root).Show(); });
             menu.Items.Add("OpenAI 状态与输出速度",null,delegate{if(serviceHealthWindow==null||serviceHealthWindow.IsDisposed)serviceHealthWindow=new ServiceHealthForm(serviceHealth);serviceHealthWindow.Show(window.Visible?window:null);});
             menu.Items.Add("Credits 余额与变化",null,delegate{MessageBox.Show(credits.Snapshot.Detail,"Credits 余额与变化",MessageBoxButtons.OK,MessageBoxIcon.Information);});
@@ -574,6 +577,12 @@ namespace CodexUsageTray
                 }
                 return 0;
             }
+            if(args.Length>1&&args[0]=="--api-preview")
+            {
+                using(var form=new ApiUsageForm(root)){CreateHandles(form);form.PerformLayout();PreviewHost.Render(form,args[1]);}
+                return 0;
+            }
+            if(args.Length>1&&args[0]=="--api-ui-test")return ApiUsageUiValidation.Run(root,args[1]);
             if(args.Length>1&&args[0]=="--composition-test")return CompositionValidation.Run(args[1]);
             if(args.Length>2&&args[0]=="--history-check")
             {

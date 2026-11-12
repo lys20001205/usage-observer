@@ -1,3 +1,12 @@
+## API value and simple three-device sync
+
+- Add API Standard USD values by device, model and reset cycle, including cached reads, output reasoning and per-request long-context pricing. Unknown models remain unpriced.
+- Backfill 31 days of local JSONL and Zstandard archives into a separate incremental ledger. Preserve the existing recorder database and account credentials.
+- Compare matching first-85-percent snapshots across devices. Merge observed window boundaries and cutoff times before enabling proportional budget allocation.
+- Add configurable budget allocation, defaulting to USD 200 and three devices. Keep offline and incomplete data visible; allocate only after the selected devices have aligned valid values.
+- Simplify setup to one connection code and Connect-and-sync on each PC, with automatic computer names and existing GitHub CLI/Git login. Credentials remain local; advanced read-only and token settings are preserved.
+- Ship a hash-pinned archive reader and support cooperative shutdown of companion workers during installation.
+
 ## Credits balance and observed changes
 
 - Show Credits balance and today's observed decrease in the floating widget. Hover or use the context menu for the latest delta and collection coverage.
