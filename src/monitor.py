@@ -1,10 +1,11 @@
 """Local account recorder plus private-LAN metadata discovery; no inference."""
 import argparse,concurrent.futures,datetime as dt,json,os,pathlib,sqlite3,subprocess,time,msvcrt,csv
 from portable import DATA,APP,settings,detect_codex,detect_dsh,lan_config,codex_login_marker
-from quota_core import RateReader,quota_error,database,ingest,last_quota,write_json,now
+from quota_core import RateReader,quota_error,database,ingest,last_quota,now
 from collector import collect
 from deepseek_monitor import DeepSeekMonitor
 from machine_time import format_local
+from recorder_state import load_state,save_state,write_json
 HOST=os.environ.get('COMPUTERNAME','')
 ORIGINAL_CODEX_HOME=os.environ.get('CODEX_HOME')
 def safe_read(path):
@@ -48,11 +49,11 @@ def main():
  lock=(DATA/'monitor.lock').open('a+b');lock.seek(0)
  try:msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
  except OSError:raise SystemExit('Recorder already running')
- state=safe_read(DATA/'state.json')or{'start':now(),'cursors':{'A':{},'B':{}},'sample_number':0}
- state.update(interval=a.interval,running=True);write_json(DATA/'state.json',state)
- (DATA/'stop.request').unlink(missing_ok=True);(DATA/'monitor.pid').write_text(str(os.getpid()))
  c=database();c.executescript('CREATE TABLE IF NOT EXISTS peer_samples(device_id TEXT,time TEXT,data_json TEXT,PRIMARY KEY(device_id,time));')
+ state_path=DATA/'state.json';state=load_state(c,state_path)
+ state.update(interval=a.interval,running=True);save_state(c,state_path,state)
  rate=None;deepseek=DeepSeekMonitor(c,None);pool=concurrent.futures.ThreadPoolExecutor(max_workers=2);lan=None;lan_signature=None;cycles=0;config_stamp=None
+ (DATA/'stop.request').unlink(missing_ok=True);(DATA/'monitor.pid').write_text(str(os.getpid()))
  health={'A':{'status':'unavailable'},'B':{'status':'ok'},'classification':'本机记录；共享额度不能换算为机器百分点'};quota={}
  try:
   while not(DATA/'stop.request').exists():
@@ -94,12 +95,12 @@ def main():
    except Exception as e:
     (DATA/'errors.log').open('a',encoding='utf-8').write('DeepSeek: '+type(e).__name__+'\n')
    quota['account_marker']=marker
-   c.execute('INSERT INTO samples(time,quota_json,health_json)VALUES(?,?,?)',(quota['time'],json.dumps(quota),json.dumps(health)));c.commit()
-   state['sample_number']+=1;write_json(DATA/'state.json',state);export(c,state,health,quota);cycles+=1
+   c.execute('INSERT INTO samples(time,quota_json,health_json)VALUES(?,?,?)',(quota['time'],json.dumps(quota),json.dumps(health)))
+   state['sample_number']+=1;save_state(c,state_path,state);export(c,state,health,quota);cycles+=1
    if a.cycles and cycles>=a.cycles:break
    while time.monotonic()-tick<a.interval and not(DATA/'stop.request').exists():time.sleep(.5)
  finally:
-  state['running']=False;write_json(DATA/'state.json',state);export(c,state,health,quota)
+  state['running']=False;save_state(c,state_path,state);export(c,state,health,quota)
   if rate:rate.close()
   if lan:
    try:lan.stdin.close();lan.wait(timeout=3)

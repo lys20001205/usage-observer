@@ -5,16 +5,15 @@ BASE=DATA
 NODE=APP/'runtime/node/node.exe'
 MODULES=APP/'node_modules'
 from machine_time import local_day_start_utc, format_local
+from recorder_state import load_state,save_state,write_json
 def now():return dt.datetime.now(dt.timezone.utc).isoformat()
-def atomic(path,data):
- temp=path.with_suffix(path.suffix+'.tmp');temp.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8');temp.replace(path)
 class DeepSeekMonitor:
  def __init__(self,connection,codex_remote_class):
   self.c=connection;self.state_path=BASE/'deepseek-state.json'
-  self.state=json.loads(self.state_path.read_text(encoding='utf-8')) if self.state_path.exists() else {'start':now(),'cursors':{'A':{},'B':{}}}
   self.c.executescript('''CREATE TABLE IF NOT EXISTS deepseek_events(host TEXT,event_id TEXT,session_id TEXT,time TEXT,model TEXT,provider TEXT,input_tokens INTEGER,uncached_input_tokens INTEGER,cached_input_tokens INTEGER,output_tokens INTEGER,reasoning_output_tokens INTEGER,total_tokens INTEGER,seq INTEGER,PRIMARY KEY(host,event_id));
   CREATE TABLE IF NOT EXISTS deepseek_balances(id INTEGER PRIMARY KEY,time TEXT,account_fingerprint TEXT,currency TEXT,topped_up_balance TEXT,granted_balance TEXT,total_balance TEXT);
   CREATE TABLE IF NOT EXISTS deepseek_health(id INTEGER PRIMARY KEY,time TEXT,data_json TEXT);''')
+  self.state=load_state(self.c,self.state_path,deepseek=True)
  def since(self):return local_day_start_utc(6).isoformat()
  def read_local(self):
   args={'home':str(detect_dsh()),'since':self.since(),'cursors':self.state['cursors']['A'],'balance':True,'modules':str(MODULES)}
@@ -39,7 +38,7 @@ class DeepSeekMonitor:
     top=decimal.Decimal(row['topped_up_balance']);bonus=decimal.Decimal(row['granted_balance'])
     self.c.execute('INSERT INTO deepseek_balances(time,account_fingerprint,currency,topped_up_balance,granted_balance,total_balance) VALUES(?,?,?,?,?,?)',(balance['sampled_at'],balance['account_fingerprint'],row['currency'],str(top),str(bonus),str(top+bonus)))
   health['balance']={'status':(balance or {}).get('status','unavailable'),'error':(balance or {}).get('error')}
-  self.c.execute('INSERT INTO deepseek_health(time,data_json) VALUES(?,?)',(stamp,json.dumps(health)));self.c.commit();atomic(self.state_path,self.state);self.export(health,stamp)
+  self.c.execute('INSERT INTO deepseek_health(time,data_json) VALUES(?,?)',(stamp,json.dumps(health)));save_state(self.c,self.state_path,self.state);self.export(health,stamp)
  def export(self,health,stamp):
   today=local_day_start_utc().isoformat()
   totals={host:int(self.c.execute('SELECT coalesce(sum(total_tokens),0) FROM deepseek_events WHERE host=? AND time>=?',(host,today)).fetchone()[0]) for host in ['A','B']}
@@ -54,7 +53,7 @@ class DeepSeekMonitor:
     today_decreases=sum((max(decimal.Decimal(a['total_balance'])-decimal.Decimal(b['total_balance']),decimal.Decimal(0)) for a,b in zip(today_history,today_history[1:])),decimal.Decimal(0))
     row=dict(history[-1]);row.update(observed_decrease=str(decreases),today_observed_decrease=str(today_decreases));wallets.append(row)
   status={'recording_started_at':self.state['start'],'last_sample_at':stamp,'health':health,'wallets':wallets,'today_tokens':totals,'recorded_tokens':since_totals,'token_coverage':'provider-reported local DSH logs; other clients and accounts are not covered','balance_coverage':'DSH login wallet, account-wide; decreases are observed net changes, not an itemized bill'}
-  atomic(BASE/'deepseek-status.json',status)
+  write_json(BASE/'deepseek-status.json',status)
   for filename,query in [('deepseek-usage.csv','SELECT * FROM deepseek_events ORDER BY time'),('deepseek-balances.csv','SELECT * FROM deepseek_balances ORDER BY id')]:
    cursor=self.c.execute(query)
    with (BASE/filename).open('w',encoding='utf-8-sig',newline='') as f:

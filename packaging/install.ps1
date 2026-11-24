@@ -24,7 +24,7 @@ if($CheckOnly){Write-Output ('Verified: '+$manifest.version+' / '+$files.Count+'
 # Verify all package entries, but replace only changed files. Unchanged runtime
 # binaries may be in use by the recorder or a companion sync process.
 $updates=@($files | Where-Object {!(Test-Path -LiteralPath $_.Destination) -or (Read-Sha256 $_.Destination) -ne $_.Hash})
-$recorderChanges=@($updates | Where-Object {$_.Relative -match '^(runtime[/\\]|node_modules[/\\]|monitor\.py$|collector\.py$|portable\.py$|quota_core\.py$|deepseek|lan-agent|start\.ps1$|stop\.ps1$)'})
+$recorderChanges=@($updates | Where-Object {$_.Relative -match '^(runtime[/\\]|node_modules[/\\]|monitor\.py$|collector\.py$|portable\.py$|quota_core\.py$|recorder_state\.py$|deepseek|lan-agent|start\.ps1$|stop\.ps1$)'})
 $stopRecorder=$recorderChanges.Count -gt 0
 $syncChanges=@($updates | Where-Object {$_.Relative -match '^(runtime[/\\]|github_sync\.py$)'})
 $stopSync=$syncChanges.Count -gt 0

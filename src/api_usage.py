@@ -82,7 +82,7 @@ def manifest(home, since):
     db = home / 'state_5.sqlite'
     entries = []
     if db.is_file():
-        with sqlite3.connect(db.resolve().as_uri() + '?mode=ro', uri=True, timeout=5) as c:
+        with contextlib.closing(sqlite3.connect(db.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)) as c:
             columns = {r[1] for r in c.execute('PRAGMA table_info(threads)')}
             acct = 'creator_account_id' if 'creator_account_id' in columns else 'NULL'
             for sid, value, account in c.execute('SELECT id,rollout_path,' + acct + ' FROM threads WHERE updated_at>=?', (int(since),)):
@@ -218,7 +218,7 @@ def quota_windows(c, database, shared, at):
     single_tag = next(iter(tags.values())) if len(set(tags.values())) == 1 else 'unknown'
     windows = []
     if database.is_file():
-        with sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True, timeout=5) as q:
+        with contextlib.closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)) as q:
             for t, raw in q.execute('SELECT time,quota_json FROM samples WHERE time>=? ORDER BY id', (iso(at - 32*86400),)):
                 value = json.loads(raw); when = stamp(t)
                 if value.get('error') or when > at + 300: continue

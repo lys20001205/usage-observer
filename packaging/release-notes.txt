@@ -1,3 +1,25 @@
+## Recover recording after an unexpected shutdown
+
+- Keep Codex and DeepSeek recording checkpoints in SQLite alongside the corresponding samples. Restore from the checkpoint if a state JSON file is damaged.
+- Recover older installations from the last valid recording start or the earliest database sample. Rebuild the scan cursors using the original event identifiers for deduplication.
+- Ship the offline legacy A/B recorder repair helper in the Windows package.
+
+## Active-turn service tier attribution
+
+- Keep the service tier captured at turn start for every response in that turn. Mid-turn changes apply to the next new turn.
+- Prefer matching execution-log tier metadata by exact chat and turn identity when available.
+- Show the sample's execution tier separately from the current configured tier, including a next-turn label for pending changes.
+- Rebuild only the speed cache; do not interrupt active Codex tasks or modify their settings.
+
+## Per-chat speed and measured request timing
+
+- Group request output speed by chat, model and configured Standard, Fast or Ultrafast tier. Read current tier-change events and label missing metadata as unknown.
+- Show independent five-minute and thirty-minute windows, last-request speed, average speed, sample counts and request duration. Pin a row to the floating widget or follow the most recently active chat.
+- Replace inferred item-cadence timing with recorded request-phase boundaries. Include first-token waiting and transport, and subtract recognized explicit tool intervals.
+- Keep valid responses above 300 tokens per second, subsecond responses and small outputs. Reject invalid timing or inconsistent counters without clamping valid speeds.
+- Rebuild only the speed cache. Preserve source logs, usage history, API values, login, sync and widget settings.
+- Close read-only API-ledger connections deterministically to support Windows validation and updates.
+
 ## API value and simple three-device sync
 
 - Add API Standard USD values by device, model and reset cycle, including cached reads, output reasoning and per-request long-context pricing. Unknown models remain unpriced.
